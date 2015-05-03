@@ -1,0 +1,12 @@
+Apache mpi2
+Copyright 2015 The Apache Software Foundation
+
+
+The util part is code written by Rainer Gemulla licenced under Apache licence v2.0
+
+
+
+
+
+
+

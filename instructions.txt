@@ -1,0 +1,179 @@
+
+This project contains code for the LEMP framework described in:
+
+"LEMP: Fast Retrieval of Large Entries in a Matrix Product", C.Teflioudi, R.Gemulla, O.Mykytiuk, in SIGMOD 2015.
+
+The task of LEMP is, given two input matrices Q^T and P, to find all large entries in their product Q^TP. 
+For more information about potential application scenarios and about the framework itself, please refer  to the above paper.
+
+This code corresponds to the core of LEMP, implementing only the methods INCR, LENGTH, COORD and TA. LEMP can also be used with many other methods including Cover Trees, L2AP, BLSH-Lite.
+The code for these methods is not included in this package because of licence compatibility issues. If you are interested in the performance of these methods you can contact us directly 
+at chteflio@mpi-inf.mpg.de
+
+
+1. DEPENDENCIES
+
+You will need:
+
+Boost (program_options, math_c99, unit_test_framework, random): tried on version 1.49
+CMake         >= 2.8.5
+OpenMP
+  
+  
+
+3. INSTALLATION
+ 
+cd to the build directory and type:
+$ cmake  ../
+$ make
+
+
+
+4. INPUT MATRICES
+LEMP expects 2 matrices as input. One matrix (Q^T) with dimensions m x r and another one (P) with dimensions r x n, where r is the rank of the factorization. In other words LEMP will solve a problem with m query vectors, n probe vectors, all of dimensionality r.
+Both Q^T and P should be in .mma format in column order. Such files look, for example, like the following:
+
+%%MatrixMarket matrix array real general
+% First line: ROWS COLUMNS
+% Subsequent lines: entries in column-major order
+3 2
+a11
+a21
+a31
+a12
+a22
+a32
+ 
+The datasets used in the paper "LEMP: Fast Retrieval of Large Entries in a Matrix Product" can be found at http://dws.informatik.uni-mannheim.de/en/resources/software/lemp/
+
+5. EXAMPLE USAGE
+
+cd to build/tools. The executable running lemp is called runAlgoWithTuner. Type ./runAlgoWithTuner to see the parameters
+
+Options:
+  --help                            produce help message
+  --Q^T arg                         file containing the query matrix (left
+                                    side)
+  --P arg                           file containing the probe matrix (right
+                                    side)
+  --theta arg                       theta value
+  --eps arg (=0.029999999999999999) epsilon value (experimental)
+  --querySideLeft arg (=1)          1 if Q^T contains the queries (default).
+                                    Interesting for Row-Top-k
+  --method arg                      LEMP_X where X: L, LI, LC, I, C, TA
+  --k arg (=0)                      top k (default 0). If 0 Above-theta will
+                                    run
+  --logFile arg            	    output File (contains runtime information)
+  --resultsFile arg        	    output File (contains the results)
+  --cacheSizeinKB arg (=8192)       cache size in KB
+  --t arg (=1)                      num of threads (default 1)
+
+
+
+If --k=0 (default value) the program  will try to solve the Above-theta problem. Otherwise the Row-Top-k.
+If you wish to run Column-Top-k, set --querySideLeft=0.
+For filling in the value "cacheSizeinKB", use the command: cat /proc/cpuinfo and get the value (cache size)/(cpu cores). This is important since LEMP tries to optimize for cache utilization.
+LEMP can choose from a variety of methods to use inside its buckets. You can use:
+LEMP_L: LEMP with the LENGTH algorithm (a version of naive retrieval). It prunes only based on skew in the length distribution of the vectors.
+LEMP_I: LEMP with the INCR algorithm. It can prune buckets due to skew in the length distribution. For the remaining buckets it will INCR for further pruning based on the vectors' directions.
+LEMP_C: like LEMP_I but with COORD instead of INCR
+LEMP_TA: like LEMP_I but with Fagin's TA algorithm instead of INCR
+LEMP_LI: like LEMP_I, but in this case within a bucket lemp can use either LENGTH or INCR depending on the query vector and the bucket's properties
+LEMP_LC: like LEMP_LC, but with COORD instead of INCR.
+
+According to our experiments, the best performing method was LEMP_LI. In the following you can see some examples:
+
+5.1. Find all entries with theta >= 0.035 on a machine with 2048 cache per core using LEMP_LI
+./runAlgoWithTuner --Q^T="w-50-gnmf-zero.mma" --P="h-50-gnmf-zero.mma" --theta=0.035 --method="LEMP_LI" --cacheSizeinKB=2048 --outputFile=log.txt
+
+
+And here is the result:
+Reading file: w-50-gnmf-zero.mma -- columns: 50  rows: 771611
+Reading file: h-50-gnmf-zero.mma -- columns: 132209  rows: 50
+Writing output to log.txt
+Cache Size (KB) per Processor: 2048
+ALGO: LEMP_LI
+Threads used 1
+Probe Buckets: 146
+Query Batches: 1081
+Active Buckets used for index initialization: 79
+Multiplication starts! theta: 0.035
+Time for Retrieval: 4.7224s
+Size of result: 10010917
+Comparisons: 39199798
+Preprocessing Time: 0.655978
+Tuning Time: 0.224404
+Total Time: 5.60278
+0.655978        0.224404        4.7224  5.60278
+
+
+
+The program reports the number of probe buckets created and the number of buckets for which lemp constructs indexes. The latter is the exact number in the case of Above-theta and a lower bound for Row-Top-k.
+We also report preprocessing time (sorting, bucketization, index construction), tuning time, retrieval time and total time (also reported in the last line). In addition, lemp reports the size of the result and number of candidates verified (comparisons).
+In the file log.txt, lemp reports in tab seperated values format:
+
+Method	 Q^T	Threads	ProbeBuckets	QueryBatches	theta	Comparisons	ResultSize	PreprocessingTime	TuningTime	RetrievalTime	TotalTime
+
+
+If a resultsFile is specified, lemp will used it to ouput its results. Each line in the file corresponds to a large entry in the form:
+
+query_vector_Id probe_vector_id score
+
+where "score" can be the inner product of the two vectors (above-theta) or the inner product divided by the length of the query (Row_Top-k).
+
+
+5.2. Find the Row-Top-10 on a machine with 2048 cache per core using LEMP_LI
+./runAlgoWithTuner --Q^T="w-50-gnmf-zero.mma" --P="h-50-gnmf-zero.mma" --k=10 --method="LEMP_LI" --cacheSizeinKB=2048 --outputFile=log.txt
+
+
+If you wish to run the naive algorithm for comparison reasons, you can use the executable ./runNaive also located in build/tools. Here are the parameters:
+
+Options:
+  --help                   produce help message
+  --Q^T arg                file containing Q^T
+  --P arg                  file containing the P
+  --theta arg              theta
+  --k arg (=0)             top k (default 0). If 0 Above-theta will run
+  --querySideLeft arg (=1) 1 if Q^T contains the queries (default). Interesting
+                           for Row-Top-k
+                           
+  --logFile arg            output File (contains runtime information)
+  --resultsFile arg        output File (contains the results)
+
+  
+  
+Similarly you can use the executable   runTA_all to use a simple Threshold Algorithm with Random Accesses to find the large inner products. Here are the parameters:
+
+Options:
+  --help                   produce help message
+  --Q^T arg                file containing Q^T
+  --P arg                  file containing the P
+  --theta arg              theta value
+  --k arg (=0)             top k (default 0). If 0 Above-theta will run
+  --querySideLeft arg (=1) 1 if Q^T contains the queries (default). Interesting
+                           for Row-Top-k
+  --logFile arg            output File (contains runtime information)
+  --resultsFile arg        output File (contains the results)
+
+  
+  
+  
+Notice that LEMP uses a couple of space-optimizations at compile time. This means that LEMP might ask you to change a parameter in a file and recompile depending on the size of your dataset. 
+If you want to further speed up the inner product computation uncomment the flag WITH_SIMD in taLib/structs/Definitions.h and recompile.
+If you want to further speed up the INCR scanning uncomment the flag WITH_SIMD_INCR in taLib/structs/Definitions.h and recompile.
+
+Did you find any bugs? Do you have questions? Feel free to contact us: chteflio@mpi-inf.mpg.de
+
+
+
+
+
+
+
+
+
+
+
+    
+    
+

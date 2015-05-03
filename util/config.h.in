@@ -1,0 +1,7 @@
+#ifndef LIBRG_CONFIG_H
+#define LIBRG_CONFIG_H
+
+#cmakedefine HAVE_INTTYPES_H 1
+#cmakedefine HAVE_STDINT_H 1
+
+#endif
