@@ -357,6 +357,7 @@ namespace ta {
                 i = parent(i);
             }
             heap[i] = key;
+            size = heap.size();
             return true;
         }
 
@@ -471,6 +472,7 @@ namespace ta {
                 i = parent(i);
             }
             heap[i] = key;
+            size = heap.size();
             return true;
         }
 
