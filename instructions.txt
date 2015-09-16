@@ -178,6 +178,9 @@ Options:
   
   
 Notice that LEMP uses a couple of space-optimizations at compile time. This means that LEMP might ask you to change a parameter in a file and recompile depending on the size of your dataset. 
+If you want to further speed up the inner product computation uncomment the flag WITH_SIMD in taLib/structs/Definitions.h and recompile.
+If you want to further speed up the ICOORD/INCR scanning uncomment the flag WITH_SIMD_INCR in taLib/structs/Definitions.h and recompile.
+For using approximations like LEMP-REL and LEMP-ABS, you need to uncomment the flag RELATIVE_APPROX or ABS_APPROX and recompile. After that whenever you run LEMP-L, LEMP-I or LEMP-LI the approximate version will run.
 
 Did you find any bugs? Do you have questions? Feel free to contact us: chteflio@mpi-inf.mpg.de
 
