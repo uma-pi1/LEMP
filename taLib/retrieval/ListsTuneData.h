@@ -26,17 +26,15 @@
 namespace ta {
 
     struct ListTuneData {
-        bool active;
         bool upperActive, lowerActive;
-        unordered_map<col_type, double> bestTimeForList;
-        unordered_map<col_type, std::vector<double> > timeX; //1d:list 2d: query
-        row_type bestNumLists;
-        double bestTimeX;
+        unordered_map<col_type, double> bestTimeForPhi; // for each phi explored (key) contains the best achieved total time (value) 
+        unordered_map<col_type, std::vector<double> > timeX; //key: phi value, value: runtimes for each sample query
+        row_type bestPhi;// the phi value that managed to achieve the best total runtime 
+        double bestTime;// the best total runtime corresponding to the bestPhi. 
         col_type* queues;
         row_type t_b_indx;
 
-        inline ListTuneData() : queues(0), active(true), upperActive(true), lowerActive(true) {
-
+        inline ListTuneData() : queues(0),  upperActive(true), lowerActive(true) {
         }
 
         inline ~ListTuneData() {
@@ -50,9 +48,8 @@ namespace ta {
         }
         
        
-
+        // I drop and recreate the queues for each phi I try out
         inline void preprocess(std::vector<RetrievalArguments>& retrArg, col_type numLists, Retriever* retriever) {
-
 
             if (queues != 0) {
                 delete[] queues;
@@ -94,10 +91,9 @@ namespace ta {
                     queues[j * numLists + i] = tmp[i].id;
                 }
             }
-
         }
 
-        inline void findCutOffPointForList(col_type list, double otherTime, std::vector<double>* competitorMethod, bool upper, Retriever* retriever) {
+        inline void findCutOffPointForList(col_type list, double bestTimeOfPrevPhi, std::vector<double>* competitorMethod, bool upper, Retriever* retriever) {
             double time;
 
 
@@ -105,32 +101,34 @@ namespace ta {
                 retriever->calculateTimeInCutoff(timeX[list], *competitorMethod, i, time);
 
 
-                if ((i == 0) || bestTimeForList[list] > time) {
-                    bestTimeForList[list] = time;
+                if ((i == 0) || bestTimeForPhi[list] > time) {
+                    bestTimeForPhi[list] = time;
                 }
 
-                if ((otherTime < 0 && i == 0) || bestTimeX > 1.1 * time) {// take into consideration caching effects
-                    bestTimeX = time;
+                if ((bestTimeOfPrevPhi < 0 && i == 0) || bestTime > 1.1 * time) {// take into consideration caching effects
+                    bestTime = time;
                     t_b_indx = i;
-                    bestNumLists = list;
+                    bestPhi = list;
                 }
 
 
-                if (competitorMethod == NULL) { // we have LEMP_C or LEMP_I
+                if (competitorMethod == NULL) { // we have LEMP_C or LEMP_I, competitor method is in practice LENGTH
                     t_b_indx = 0;
                     break;
                 }
 
             }
 
-            if (list == 1) {
+            if (list == 1) { // inactivate exploration left and right if you have hit borders
                 lowerActive = false;
             } else if (list == NUM_LISTS) {
                 upperActive = false;
             }
 
-            if (otherTime > 0) {
-                if (bestTimeForList[list] > 1.1 * otherTime) {
+
+            if (bestTimeOfPrevPhi > 0) {// if this is not the first phi value to be explored
+                if (bestTimeForPhi[list] > 1.1 * bestTimeOfPrevPhi) { // if you are more than 1.1 times worse than the previous list, stop exploring
+		    
                     if (upper)
                         upperActive = false;
                     else
@@ -141,8 +139,6 @@ namespace ta {
 
         inline void tuneBucketForList(ProbeBucket& probeBucket, col_type numLists, double otherTime, bool upper,
                 std::vector<RetrievalArguments>& retrArg, Retriever* retriever) {
-
-//            std::cout<<"list "<<(int)numLists<<std::endl;
 
             // I use retrArg[0] for all running
             retrArg[0].setIntervals(numLists);
@@ -184,7 +180,6 @@ namespace ta {
         void tuneBucketForListTopk(ProbeBucket& probeBucket, std::vector<RetrievalArguments>& retrArg,
                 col_type numLists, double otherTime, bool upper, Retriever* retriever) {
 
-//            std::cout<<"list "<<(int)numLists<<std::endl;
             // I use retrArg[0] for all running
             retrArg[0].setIntervals(numLists);
             probeBucket.numLists = numLists;
@@ -196,7 +191,6 @@ namespace ta {
             preprocess(retrArg, numLists, retriever);
             retrArg[0].tunerTimer.stop();
             double preprocessTime = retrArg[0].tunerTimer.elapsedTime().nanos() / (retriever->xValues->size() == 0 ? 1 : retriever->xValues->size());
-            //std::cout<<"list"<<(int)numLists<<" preprocess: "<<preprocessTime<<std::endl;
             row_type b = retrArg[0].bucketInd;
 
 
@@ -216,8 +210,6 @@ namespace ta {
                 const col_type * localQueue = getQueue(i, numLists);
                 retrArg[0].setQueues(localQueue);
                 
-                
-
                 retrArg[0].tunerTimer.start();
                 retriever->runTopK(query, probeBucket, &retrArg[0]);///////////////
                 retrArg[0].tunerTimer.stop();
@@ -226,66 +218,61 @@ namespace ta {
             findCutOffPointForList(numLists - 1, otherTime, retrArg[0].competitorMethod, upper, retriever);
         }
 
+        
         inline void tune(ProbeBucket& probeBucket, std::vector<RetrievalArguments>& retrArg, Retriever* retriever) {
-
-            active = true;
             upperActive = true;
             lowerActive = true;
             
-            col_type list = (retrArg[0].prevList < 0 ? 1 : retrArg[0].prevList);
+            // if it is the first bucket to tune, start exploring from phi=1
+            // otherwise start from the best phi of the previous bucket
+            col_type list = (retrArg[0].prevBucketBestPhi < 0 ? 1 : retrArg[0].prevBucketBestPhi);
 
-//            std::cout<<"Start with lists: "<<(int) list<<std::endl;
-
+            // explore an initial phi value
             tuneBucketForList(probeBucket, list, -1, true, retrArg, retriever);
 
-            double previousForUpper = bestTimeForList[list - 1];
-            double previousForLower = bestTimeForList[list - 1];
+            // Here I keep track of the best total runtime 
+            double bestTimeOfPrevPhiOnLeft = bestTimeForPhi[list - 1];
+            double bestTimeOfPrevPhiOnRight = bestTimeForPhi[list - 1];
 
+            // explore phi values left and right of the initial phi value
             int tries = NUM_LISTS / 2;
             for (col_type i = 1; i <= tries; i++) {
 
                 if (upperActive) {
-                    tuneBucketForList(probeBucket, list + i, previousForUpper, true, retrArg, retriever);
-                    previousForUpper = bestTimeForList[list + i - 1];
+                    tuneBucketForList(probeBucket, list + i, bestTimeOfPrevPhiOnLeft, true, retrArg, retriever);
+                    bestTimeOfPrevPhiOnLeft = bestTimeForPhi[list + i - 1];
                 }
                 if (lowerActive) {
-                    tuneBucketForList(probeBucket, list - i, previousForLower, false, retrArg, retriever);
-                    previousForLower = bestTimeForList[list - i - 1];
+                    tuneBucketForList(probeBucket, list - i, bestTimeOfPrevPhiOnRight, false, retrArg, retriever);
+                    bestTimeOfPrevPhiOnRight = bestTimeForPhi[list - i - 1];
                 }
                 if (!upperActive && !lowerActive)
                     break;
             }
 
 
-            retrArg[0].prevList = bestNumLists + 1; // ready for the next bucket to start from
+            retrArg[0].prevBucketBestPhi = bestPhi + 1; // ready for the next bucket to start from
 
             if (queues != 0) {
                 delete [] queues;
                 queues = 0;
             }
 
-
+            
             double value = (t_b_indx == 0 ? -1 : retriever->xValues->at(t_b_indx).result);
-            probeBucket.setAfterTuning(bestNumLists + 1, value);
+            probeBucket.setAfterTuning(bestPhi + 1, value);
 
         }
 
         void tuneTopk(ProbeBucket& probeBucket, std::vector<RetrievalArguments>& retrArg, Retriever* retriever) {
-
-
-            active = true;
             upperActive = true;
-            lowerActive = true;
-        
+            lowerActive = true;        
 
-            col_type list = (retrArg[0].prevList < 0 ? 1 : retrArg[0].prevList);
-
-           
+            col_type list = (retrArg[0].prevBucketBestPhi < 0 ? 1 : retrArg[0].prevBucketBestPhi);           
             tuneBucketForListTopk(probeBucket, retrArg, list, -1, true, retriever);
 
-            double previousForUpper = bestTimeForList[list - 1];
-            double previousForLower = bestTimeForList[list - 1];
-//            std::cout<<"list: "<<(int) list<<" time: "<<previousForLower<<std::endl;
+            double previousForUpper = bestTimeForPhi[list - 1];
+            double previousForLower = bestTimeForPhi[list - 1];
 
 
             int tries = NUM_LISTS / 2;
@@ -294,17 +281,17 @@ namespace ta {
 
                 if (upperActive) {
                     tuneBucketForListTopk(probeBucket, retrArg, list + i, previousForUpper, true, retriever);
-                    previousForUpper = bestTimeForList[list + i - 1];
+                    previousForUpper = bestTimeForPhi[list + i - 1];
                 }
                 if (lowerActive) {
                     tuneBucketForListTopk(probeBucket, retrArg, list - i, previousForLower, false, retriever);
-                    previousForLower = bestTimeForList[list - i - 1];
+                    previousForLower = bestTimeForPhi[list - i - 1];
                 }
                 if (!upperActive && !lowerActive)
                     break;
             }
 
-            retrArg[0].prevList = bestNumLists + 1; // ready for the next bucket to start from
+            retrArg[0].prevBucketBestPhi = bestPhi + 1; // ready for the next bucket to start from
 
             if (queues != 0) {
                 delete [] queues;
@@ -312,7 +299,7 @@ namespace ta {
             }
 
             double value = (t_b_indx == 0 ? -1 : retriever->xValues->at(t_b_indx).result);
-            probeBucket.setAfterTuning(bestNumLists + 1, value);
+            probeBucket.setAfterTuning(bestPhi + 1, value);
         }
 
     };

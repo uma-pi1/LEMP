@@ -1,17 +1,3 @@
-//    Copyright 2015 Christina Teflioudi
-// 
-//    Licensed under the Apache License, Version 2.0 (the "License");
-//    you may not use this file except in compliance with the License.
-//    You may obtain a copy of the License at
-// 
-//        http://www.apache.org/licenses/LICENSE-2.0
-// 
-//    Unless required by applicable law or agreed to in writing, software
-//    distributed under the License is distributed on an "AS IS" BASIS,
-//    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//    See the License for the specific language governing permissions and
-//    limitations under the License.
-
 /*
  * Bucket.h
  *
@@ -38,8 +24,7 @@ enum Index_Type{
 	INT_SL = 2,
 	TREE = 3,
         AP = 4,
-        BLSH = 5,
-        LSH = 6
+        LSH = 5,
 
 };
 
@@ -59,16 +44,12 @@ public:
         row_type activeQueries; // active queries for this bucket. If multiple threads this will just be an estimation
 
 
-
-	rg::Timer bucketTimer;
-
-	inline ProbeBucket(): numLists(1), t_b(1), runtime(0),  activeQueries(0){ ///////////////////
+	inline ProbeBucket(): numLists(1), t_b(1), runtime(0),  activeQueries(0){ 
 		ptrIndexes[PLAIN] = 0;
 		ptrIndexes[SL] = 0;
 		ptrIndexes[INT_SL] = 0;
 		ptrIndexes[TREE] = 0;
                 ptrIndexes[AP] = 0;
-                ptrIndexes[BLSH] = 0;
                 ptrIndexes[LSH] = 0;
 
 	};
@@ -80,15 +61,12 @@ public:
 		if(ptrIndexes[INT_SL] != 0){
 			delete static_cast<IntLists*>(ptrIndexes[INT_SL]);
 		}
-// 		if(ptrIndexes[TREE] != 0){
-// 			delete static_cast<TreeIndex*>(ptrIndexes[TREE]);
-// 		}
-//                 if(ptrIndexes[AP] != 0){
-// 			delete static_cast<L2apIndex*>(ptrIndexes[AP]);
-// 		}
-//                 if(ptrIndexes[BLSH] != 0){
-// 			delete static_cast<BlshIndex*>(ptrIndexes[BLSH]);
-// 		}
+		if(ptrIndexes[TREE] != 0){
+			delete static_cast<TreeIndex*>(ptrIndexes[TREE]);
+		}
+                if(ptrIndexes[AP] != 0){
+			delete static_cast<L2apIndex*>(ptrIndexes[AP]);
+		}
 //                 if(ptrIndexes[LSH] != 0){
 //                     delete static_cast<LshIndex*>(ptrIndexes[LSH]);
 //                 }

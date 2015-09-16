@@ -31,7 +31,7 @@ using namespace ta;
 using namespace boost::program_options;
 
 int main(int argc, char *argv[]) {
-    double theta, epsilon;
+    double theta, epsilon, gamma;
     string leftMatrix;
     string rightMatrix;
     string logFile, resultsFile;
@@ -50,8 +50,9 @@ int main(int argc, char *argv[]) {
             ("P", value<string>(&rightMatrix), "file containing the probe matrix (right side)")
             ("theta", value<double>(&theta), "theta value")
             ("eps", value<double>(&epsilon)->default_value(0.03), "epsilon value (experimental)")
+	    ("gamma", value<double>(&gamma)->default_value(0.0), "gamma value (experimental)")
             ("querySideLeft", value<bool>(&querySideLeft)->default_value(true), "1 if Q^T contains the queries (default). Interesting for Row-Top-k")
-            ("method", value<string>(&methodStr), "LEMP_X where X: L, LI, LC, I, C, TA")
+            ("method", value<string>(&methodStr), "LEMP_X where X: L, LI, LC, I, C, TA, TREE, AP, BLSH")
             ("k", value<int>(&k)->default_value(0), "top k (default 0). If 0 Above-theta will run")
             ("logFile", value<string>(&logFile)->default_value(""), "output File (contains runtime information)")
 	    ("resultsFile", value<string>(&resultsFile)->default_value(""), "output File (contains the results)")
@@ -88,6 +89,7 @@ int main(int argc, char *argv[]) {
     args.cacheSizeinKB = cacheSizeinKB;
     args.threads = threads;
     args.epsilon = epsilon;
+    args.gamma = gamma;
     
    
 
@@ -103,17 +105,15 @@ int main(int argc, char *argv[]) {
         args.method = LEMP_C;
     } else if (methodStr.compare("LEMP_TA") == 0) {
         args.method = LEMP_TA;
-//     } else if (methodStr.compare("LEMP_TREE") == 0) {
-//         args.method = LEMP_TREE;
-//     } else if (methodStr.compare("LEMP_AP") == 0) {
-//         args.method = LEMP_AP;
-//     } else if (methodStr.compare("LEMP_BLSH") == 0) {
-//         args.method = LEMP_BLSH;
-//     } else if (methodStr.compare("LEMP_LSH") == 0) {
-//         args.method = LEMP_LSH;
+    } else if (methodStr.compare("LEMP_TREE") == 0) {
+        args.method = LEMP_TREE;
+    } else if (methodStr.compare("LEMP_AP") == 0) {
+        args.method = LEMP_AP;
+    } else if (methodStr.compare("LEMP_LSH") == 0) {
+        args.method = LEMP_LSH;
     } 
     else {
-        cout << "I do not know this method. Try {LEMP_LI, LEMP_LC, LEMP_L, LEMP_I, LEMP_C, LEMP_TA}" << endl << endl;
+        cout << "I do not know this method. Try {LEMP_LI, LEMP_LC, LEMP_L, LEMP_I, LEMP_C, LEMP_TA, LEMP_TREE, LEMP_AP, LEMP_BLSH, LEMP_LSH}" << endl << endl;
         cout << desc << endl;
         return 1;
     }

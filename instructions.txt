@@ -3,33 +3,48 @@ This project contains code for the LEMP framework described in:
 
 "LEMP: Fast Retrieval of Large Entries in a Matrix Product", C.Teflioudi, R.Gemulla, O.Mykytiuk, in SIGMOD 2015.
 
-The task of LEMP is, given two input matrices Q^T and P, to find all large entries in their product Q^TP. 
-For more information about potential application scenarios and about the framework itself, please refer  to the above paper.
+The task of LEMP is, given two input matrices Q^T and P, to find all large entries in their product Q^TP. For more information about potential application scenarios and about the framework itself, please refer  to the above paper.
 
-This code corresponds to the core of LEMP, implementing only the methods INCR, LENGTH, COORD and TA. LEMP can also be used with many other methods including Cover Trees, L2AP, BLSH-Lite.
-The code for these methods is not included in this package because of licence compatibility issues. If you are interested in the performance of these methods you can contact us directly 
-at chteflio@mpi-inf.mpg.de
+
+LEMP adapts many existing techniques (Trees, L2AP) for the problem of large-entry retrieval.
+The code regarding these methods is to a big extend copied from publicly available code provided by the authors of these methods (the original licences are included).
 
 
 1. DEPENDENCIES
 
-You will need:
+1.1. For LEMP-Tree: 
 
-Boost (program_options, math_c99, unit_test_framework, random): tried on version 1.49
-CMake         >= 2.8.5
-OpenMP
-  
-  
+mlpack has the following dependencies:
 
-3. INSTALLATION
+  Armadillo     >= 3.6.0
+  LibXml2       >= 2.6.0
+  Boost (program_options, math_c99, unit_test_framework, random)
+  CMake         >= 2.8.5
+
+All of those should be available in your distribution's package manager.  If
+not, you will have to compile each of them by hand.  See the documentation for
+each of those packages for more information.
+
+If you are compiling Armadillo by hand, ensure that LAPACK and BLAS are enabled.
+
+1.2. For LEMP-L2AP: L2AP uses a number of memory allocation and file handling routines from GKlib, a library by George Karypis included with the METIS software. 
+A compatible version of this library is included in LEMP/GKlib
+If you do not already have GKlib installed, cd to GKlib, and read BUILD.txt for installation instructions. GKlib requires CMake 2.8 to build.
+
+Additionally for BLSH-Lite you will also need the  GSL  library
+
+
+1.3. For LEMP: Boost (tried on 1.49)
  
-cd to the build directory and type:
+ 
+2. type:
+$ cd  LEMP/build
 $ cmake  ../
 $ make
 
 
 
-4. INPUT MATRICES
+2. INPUT MATRICES
 LEMP expects 2 matrices as input. One matrix (Q^T) with dimensions m x r and another one (P) with dimensions r x n, where r is the rank of the factorization. In other words LEMP will solve a problem with m query vectors, n probe vectors, all of dimensionality r.
 Both Q^T and P should be in .mma format in column order. Such files look, for example, like the following:
 
@@ -46,7 +61,7 @@ a32
  
 The datasets used in the paper "LEMP: Fast Retrieval of Large Entries in a Matrix Product" can be found at http://dws.informatik.uni-mannheim.de/en/resources/software/lemp/
 
-5. EXAMPLE USAGE
+3. EXAMPLE USAGE
 
 cd to build/tools. The executable running lemp is called runAlgoWithTuner. Type ./runAlgoWithTuner to see the parameters
 
@@ -60,7 +75,8 @@ Options:
   --eps arg (=0.029999999999999999) epsilon value (experimental)
   --querySideLeft arg (=1)          1 if Q^T contains the queries (default).
                                     Interesting for Row-Top-k
-  --method arg                      LEMP_X where X: L, LI, LC, I, C, TA
+  --method arg                      LEMP_X where X: L, LI, LC, I, C, TA, TREE,
+                                    AP, LSH
   --k arg (=0)                      top k (default 0). If 0 Above-theta will
                                     run
   --logFile arg            	    output File (contains runtime information)
@@ -78,12 +94,15 @@ LEMP_L: LEMP with the LENGTH algorithm (a version of naive retrieval). It prunes
 LEMP_I: LEMP with the INCR algorithm. It can prune buckets due to skew in the length distribution. For the remaining buckets it will INCR for further pruning based on the vectors' directions.
 LEMP_C: like LEMP_I but with COORD instead of INCR
 LEMP_TA: like LEMP_I but with Fagin's TA algorithm instead of INCR
+LEMP_AP: like LEMP_I but with L2AP algorithm instead of INCR
+LEMP_TREE: like LEMP_I but with the cover trees algorithm instead of INCR. Note that the this method, within a bucket we search for large inner products and not high cosine similarity as with  the previous methods
+
 LEMP_LI: like LEMP_I, but in this case within a bucket lemp can use either LENGTH or INCR depending on the query vector and the bucket's properties
 LEMP_LC: like LEMP_LC, but with COORD instead of INCR.
 
 According to our experiments, the best performing method was LEMP_LI. In the following you can see some examples:
 
-5.1. Find all entries with theta >= 0.035 on a machine with 2048 cache per core using LEMP_LI
+3.1. Find all entries with theta >= 0.035 on a machine with 2048 cache per core using LEMP_LI
 ./runAlgoWithTuner --Q^T="w-50-gnmf-zero.mma" --P="h-50-gnmf-zero.mma" --theta=0.035 --method="LEMP_LI" --cacheSizeinKB=2048 --outputFile=log.txt
 
 
@@ -122,7 +141,7 @@ query_vector_Id probe_vector_id score
 where "score" can be the inner product of the two vectors (above-theta) or the inner product divided by the length of the query (Row_Top-k).
 
 
-5.2. Find the Row-Top-10 on a machine with 2048 cache per core using LEMP_LI
+3.2. Find the Row-Top-10 on a machine with 2048 cache per core using LEMP_LI
 ./runAlgoWithTuner --Q^T="w-50-gnmf-zero.mma" --P="h-50-gnmf-zero.mma" --k=10 --method="LEMP_LI" --cacheSizeinKB=2048 --outputFile=log.txt
 
 
@@ -159,8 +178,6 @@ Options:
   
   
 Notice that LEMP uses a couple of space-optimizations at compile time. This means that LEMP might ask you to change a parameter in a file and recompile depending on the size of your dataset. 
-If you want to further speed up the inner product computation uncomment the flag WITH_SIMD in taLib/structs/Definitions.h and recompile.
-If you want to further speed up the INCR scanning uncomment the flag WITH_SIMD_INCR in taLib/structs/Definitions.h and recompile.
 
 Did you find any bugs? Do you have questions? Feel free to contact us: chteflio@mpi-inf.mpg.de
 

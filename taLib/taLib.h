@@ -25,58 +25,59 @@
 #include <taLib/structs/BasicStructs.h>
 #include <taLib/structs/Args.h>
 
-#include <taLib/structs/AuxStructs.h>
-#include <taLib/structs/VectorMatrix.h>
-#include <taLib/structs/Functions.h>
-#include <taLib/structs/Lists2.h>
-// #include <taLib/structs/ClassifierData.h>
 
-// ////////////////////////////// mlpack stuff//////////////////////
-// #include <taLib/my_mlpack/core.hpp>
-// #include <taLib/my_mlpack/fastmks/fastmks_stat.hpp>
-// #include <taLib/my_mlpack/fastmks/fastmks.hpp>
-// #include <taLib/my_mlpack/fastmks/fastmks_impl.hpp>
-// #include <taLib/my_mlpack/fastmks/fastmks_rules.hpp>
-// #include <taLib/my_mlpack/fastmks/fastmks_rules_impl.hpp>
-// ///////////////////////////////////////////////////////////////////
-// /////////// l2ap stuff ///////////////
-// #include <taLib/ap/includes.h>
-// #include <taLib/ap/connect.h>
-// #include <taLib/structs/l2apIndex.h>
-// #include <taLib/structs/LshIndex2.h>
-// #include <taLib/structs/BlshIndex2.h>
+#include <taLib/structs/VectorMatrix.h>
+#include <taLib/structs/Lists.h>
+
+////////////////////////////// mlpack stuff//////////////////////
+#include <taLib/my_mlpack/core.hpp>
+#include <taLib/my_mlpack/fastmks/fastmks_stat.hpp>
+#include <taLib/my_mlpack/fastmks/fastmks.hpp>
+#include <taLib/my_mlpack/fastmks/fastmks_impl.hpp>
+#include <taLib/my_mlpack/fastmks/fastmks_rules.hpp>
+#include <taLib/my_mlpack/fastmks/fastmks_rules_impl.hpp>
+///////////////////////////////////////////////////////////////////
+/////////// l2ap stuff ///////////////
+#include <taLib/ap/includes.h>
+#include <taLib/ap/connect.h>
 /////////////////////////////////////
 
+// #include <taLib/lsh/RandomIntGaussians.h>
+// #include <taLib/lsh/CosineSketches.h>
+// #include <taLib/lsh/LshBins.h>
 
-// #include <taLib/structs/TreeIndex.h>
+#include <taLib/structs/l2apIndex.h>
+// #include <taLib/structs/LshIndex.h>
+
+
+
+#include <taLib/structs/TreeIndex.h>
 #include <taLib/structs/Candidates.h>
 #include <taLib/structs/TAState.h>
-#include <taLib/structs/RetrievalArguments.h>
+#include <taLib/structs/TANRAState2.h>
+#include <taLib/structs/RetrievalArguments.h>//////////////////////
 #include <taLib/structs/QueryBatch.h>
 #include <taLib/structs/ProbeBucket.h>
 #include <taLib/structs/Bucketize.h>
 #include <taLib/structs/CandidateVerification.h>
-// #include <taLib/structs/Cluster.h>
-
 
 #include <taLib/retrieval/Retriever.h>
 #include <taLib/retrieval/ListsTuneData.h>
 #include <taLib/retrieval/TuneTopk.h>
 #include <taLib/retrieval/coord.h>
-#include <taLib/retrieval/incr2.h>
+#include <taLib/retrieval/icoord.h>
 #include <taLib/retrieval/ta.h>
+#include <taLib/retrieval/tanra.h>
 #include <taLib/retrieval/mixed.h>
-// #include <taLib/retrieval/singleTree.h>
-// #include <taLib/retrieval/apRetriever.h>
-// #include <taLib/retrieval/lshRetriever2.h>
-// #include <taLib/retrieval/blshRetriever2.h>
-
-
-// #include <taLib/PCATree/PCATree.h>
+#include <taLib/retrieval/singleTree.h>
+#include <taLib/retrieval/apRetriever.h>
+// #include <taLib/retrieval/lshRetriever.h> 
 
 #include <taLib/algos/naiveAlgo.h>
+#include <taLib/algos/PCATree.h>
 #include <taLib/algos/TA_all.h>
-// #include <taLib/algos/LSH_all.h>
+#include <taLib/algos/TANRA_all.h>
+// #include <taLib/algos/LSH_all2.h>
 #include <taLib/algos/algo_with_tuning.h>
 
 

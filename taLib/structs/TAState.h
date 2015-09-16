@@ -22,12 +22,7 @@
 #ifndef TASTATE_H_
 #define TASTATE_H_
 
-#include "Lists2.h"
-
-
-
-
-
+#include "Lists.h"
 
 
 namespace ta {
@@ -44,7 +39,7 @@ namespace ta {
         row_type rowNum;
 
         //NormVector fringeValues;
-//        std::vector<long> fringeDepth;
+        //        std::vector<long> fringeDepth;
         std::vector<long> fringePos;
 
         bool allSeen; //true if you should stop scanning
@@ -58,7 +53,6 @@ namespace ta {
         //methods for the 1-sided version
 
         TAState(col_type colNum) : colNum(colNum), invLists(0) {
-//            fringeDepth.resize(colNum);
             fringePos.resize(colNum);
         }
 
@@ -75,22 +69,16 @@ namespace ta {
             std::fill(exploredItems.begin(), exploredItems.end(), false);
             allSeen = false;
             piqi.clear();
-            double value;
 
 
             for (col_type i = 0; i < colNum; i++) {
                 if (query[i] < 0) { //scan downwards///////////////////////
-//                    fringeDepth[i] = 0;
                     fringePos[i] = i * invLists->size + 0;
-
                 } else {
-//                    fringeDepth[i] = rowNum - 1;
                     fringePos[i] = i * invLists->size + rowNum - 1;
                 }
-
-                //value = invLists->getValue(fringeDepth[i], i) * query[i];
-                value = invLists->getElement(fringePos[i])->data * query[i];
-                piqi.add(QueueElement(value, i));
+                if (query[i] != 0)
+                    piqi.add(QueueElement(invLists->getElement(fringePos[i])->data * query[i], i));
             }
         }
 
@@ -99,106 +87,59 @@ namespace ta {
          * returns the value of the next non-explored entry in this column
          */
 
-        inline double updateState(col_type col) {// given that the step happened on col update the structures
+        inline void updateState(col_type col) {// given that the step happened on col update the structures
+            if (!allSeen) {
+                row_type rowId;
+
+                if (query[col] < 0) {//scan downwards //////////////////
+
+                    // keep moving downwards
+                    do {
+                        fringePos[col]++;
+                        if (fringePos[col] == (col + 1) * invLists->size) {
+                            allSeen = true;
+                            break;
+                        }
+
+                        rowId = invLists->getElement(fringePos[col])->id;
+                    } while (exploredItems[rowId]);
 
 
-            if (allSeen)
-                return -1;
-            row_type rowId;
+                } else {//scan upwards
 
-            if (query[col] < 0) {//scan downwards //////////////////
-
-                // keep moving downwards
-                do {
-                    //                    fringeDepth[col]++;
-                    //                    if (fringeDepth[col] == rowNum)
-                    //                        break;
-
-                    fringePos[col]++;
-                    if (fringePos[col] == (col + 1) * invLists->size)
-                        break;
-
-
-                    //                    rowId = invLists->getRowPointer(fringeDepth[col], col);
-                    rowId = invLists->getElement(fringePos[col])->id;
-                } while (exploredItems[rowId]);
-
-                //                if (fringeDepth[col] == rowNum) {
-                //                    allSeen = true;
-                //                    return -1;
-                //                }
-
-
-                if (fringePos[col] == (col + 1) * invLists->size) {
-                    allSeen = true;
-                    return -1;
+                    // keep moving upwards
+                    do {
+                        fringePos[col]--;
+                        if (fringePos[col] < col * invLists->size) {
+                            allSeen = true;
+                            break;
+                        }
+                        rowId = invLists->getElement(fringePos[col])->id;
+                    } while (exploredItems[rowId]);
                 }
 
-            } else {//scan upwards
-
-                // keep moving upwards
-                do {
-                    //                    fringeDepth[col]--;
-                    //                    if (fringeDepth[col] < 0)
-                    //                        break;
-
-                    fringePos[col]--;
-                    if (fringePos[col] < col * invLists->size)
-                        break;
-
-                    //                    rowId = invLists->getRowPointer(fringeDepth[col], col);
-                    rowId = invLists->getElement(fringePos[col])->id;
-
-
-                } while (exploredItems[rowId]);
-
-
-//                if (fringeDepth[col] < 0) {
-//                    allSeen = true;
-//                    return -1;
-//                }
-
-                if (fringePos[col] < col * invLists->size) {
-                    allSeen = true;
-                    return -1;
+                if (!allSeen) {// update the front item                                
+                    piqi.updateRoot(invLists->getElement(fringePos[col])->data * query[col]);
                 }
-
-
             }
-
-
-            // update the front item
-//            piqi.updateRoot(invLists->getValue(fringeDepth[col], col) * query[col]);
-            
-            piqi.updateRoot(invLists->getElement(fringePos[col])->data * query[col]);
-            
-            return 1;
-
         }
+
+
 
         ///////////////// methods for threshold update ////////////////////////
 
         inline double initializeThreshold() {
             double stopThreshold = 0;
             for (col_type i = 0; i < colNum; i++) {
-                //stopThreshold += invLists->getValue(fringeDepth[i], i) * query[i];
                 stopThreshold += invLists->getElement(fringePos[i])->data * query[i];
             }
             return stopThreshold;
         }
 
-        inline void updateThreshold(double& stopThreshold, col_type stepOnCol, double oldValue) {
-            double queryPart = query[stepOnCol];
-            //            double piNew = invLists->getValue(fringeDepth[stepOnCol], stepOnCol);
-
+        inline bool isThresholdUnterTheta(double& stopThreshold, double localTheta, col_type stepOnCol, double oldValue, bool forCosine) {
             double piNew = invLists->getElement(fringePos[stepOnCol])->data;
 
-            //std::cout<<"Old: "<<oldValue<<" new: "<<piNew<<"="<<(piNew - oldValue)<<std::endl;
-            stopThreshold += queryPart * (piNew - oldValue);
-        }
-
-        inline bool isThresholdUnterTheta(double& stopThreshold, double localTheta, col_type stepOnCol, double oldValue, bool forCosine) {
-            updateThreshold(stopThreshold, stepOnCol, oldValue);
+            stopThreshold += query[stepOnCol] * (piNew - oldValue);
 
             if (stopThreshold < localTheta) {
                 return true;
@@ -215,13 +156,8 @@ namespace ta {
 
         ///////////////// methods for choosing next step ////////////////////////
 
-        inline col_type chooseStepGreatestPiQi() {
-            col_type stepOnCol = piqi.getMaxId();
-            return stepOnCol;
-        }
-
         inline col_type chooseStep() {
-            col_type stepOnCol = chooseStepGreatestPiQi();
+            col_type stepOnCol = piqi.getMaxId();
             return stepOnCol;
         }
         ////////////////////////////////////////
@@ -230,31 +166,8 @@ namespace ta {
             if (countSeen == rowNum) {
                 allSeen = true;
             } else {
-                //                row_type rowId = invLists->getRowPointer(fringeDepth[stepOnCol], stepOnCol);
-
                 row_type rowId = invLists->getElement(fringePos[stepOnCol])->id;
-
-
                 exploredItems[rowId] = true;
-                if (query[stepOnCol] < 0) {//scan downwards //////////////////////////////////
-                    if (fringePos[stepOnCol] == (stepOnCol + 1) * invLists->size - 1) {
-                        allSeen = true;
-                    }
-
-
-                    //                    if (fringeDepth[stepOnCol] == rowNum - 1) {
-                    //                        allSeen = true;
-                    //                    }
-                } else {//scan upwards
-                    if (fringePos[stepOnCol] == stepOnCol * invLists->size) {// reached the end
-                        allSeen = true;
-                    }
-
-
-                    //                    if (fringeDepth[stepOnCol] == 0) {// reached the end
-                    //                        allSeen = true;
-                    //                    }
-                }
             }
         }
 

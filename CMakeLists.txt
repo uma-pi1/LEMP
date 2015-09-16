@@ -92,11 +92,11 @@ endif()
 
 
 
-# find_package(Armadillo 3.6.0 REQUIRED)
-# include_directories(${ARMADILLO_INCLUDE_DIRS})
-# 
-# find_package(LibXml2 2.6.0 REQUIRED)
-# include_directories(${LIBXML2_INCLUDE_DIR})
+find_package(Armadillo 3.6.0 REQUIRED)
+include_directories(${ARMADILLO_INCLUDE_DIRS})
+
+find_package(LibXml2 2.6.0 REQUIRED)
+include_directories(${LIBXML2_INCLUDE_DIR})
 
 
 

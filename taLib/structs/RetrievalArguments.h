@@ -1,28 +1,14 @@
-//    Copyright 2015 Christina Teflioudi
-// 
-//    Licensed under the Apache License, Version 2.0 (the "License");
-//    you may not use this file except in compliance with the License.
-//    You may obtain a copy of the License at
-// 
-//        http://www.apache.org/licenses/LICENSE-2.0
-// 
-//    Unless required by applicable law or agreed to in writing, software
-//    distributed under the License is distributed on an "AS IS" BASIS,
-//    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//    See the License for the specific language governing permissions and
-//    limitations under the License.
-
-/*
- * RetrievalArguments.h
+/* 
+ * File:   RetrievalArguments2.h
+ * Author: chteflio
  *
- *  Created on: Jun 26, 2014
- *      Author: chteflio
+ * Created on June 26, 2015, 3:02 PM
  */
 
-#ifndef RETRIEVALARGUMENTS_H_
-#define RETRIEVALARGUMENTS_H_
-
+#ifndef RETRIEVALARGUMENTS_H
+#define	RETRIEVALARGUMENTS_H
 #include <taLib/structs/QueryBatch.h>
+#include <boost/dynamic_bitset.hpp>
 
 namespace ta {
 
@@ -43,42 +29,45 @@ namespace ta {
         std::vector<QueueElement> heap;
 
 
-//         std::vector<bool> done; // for LSH
-//         std::vector<float> sums; // for LSH
-//         std::vector<row_type> countsOfBlockValues; // for LSH
+        boost::dynamic_bitset<> done; // for LSH
+        std::vector<float> sums; // for LSH
+        std::vector<row_type> countsOfBlockValues; // for LSH
 
         std::vector<row_type> candidatesToVerify;
-        std::vector<row_type> cp_array;
-        std::vector<Candidate_incr> ext_cp_array;
+        std::vector<row_type> cp_array;// for coord
+        std::vector<Candidate_incr> ext_cp_array;// for icoord
         std::vector<QueryBucket_withTuning> queryBatches;
 
-//         std::vector<double> accum, hashlen, hashval, hashwgt; // for L2AP
+        std::vector<double> accum, hashlen, hashval, hashwgt; // for L2AP
+        
+        // for tuning
         std::vector<double>* competitorMethod;
         std::vector< std::vector< unordered_map< row_type, GlobalTopkTuneData > > > globalData; // 1: Bucket 2: thread 3: valid sample points for bucket -->result
         std::vector<row_type> sampleInd;
-//         std::vector<QueueElement> thetaForActiveBlocks; // for LSH
-//         std::vector<uint8_t> sketches;//for LSH no need to keep the actual sketches for the probe vectors. just keep the buckets with the ids
-//         std::vector<int>* clusterIds;
+        std::vector<QueueElement> thetaForActiveBlocks; // for LSH
+        
+        
+        uint8_t* sketches; //for LSH no need to keep the actual sketches for the probe vectors. just keep the buckets with the ids
+        
 
         VectorMatrix* probeMatrix;
         VectorMatrix* queryMatrix;
         TAState* state; //for TA
-//         da_rig_t *rig; // BLSH
-//         gsl_rng *r; // random number generator BLSH
-//         TreeIndex* tree; //for Tree
-        const col_type* listsQueue;
+        TANRAState* tanraState; //for TANRA
+//         RandomIntGaussians* rig;
+
+
+        TreeIndex* tree; //for Tree
+        const col_type* listsQueue;// for coord or icoord
 
         rg::Timer t, tunerTimer;
         rg::Random32 random;
-        
-        
 
-
-        int threads, k, numClusters;
-        int prevList; // to be used during tuning
+        int threads, k;
+        int prevBucketBestPhi; // to be used during tuning
 
         // for INCR or COORD
-        double theta, t_b, epsilon;
+        double theta, t_b, epsilon, gamma, currGammaAppr;
         double worstMinScore; // for L2AP
         double boundsTime, ipTime, scanTime, preprocessTime, filterTime, initializeListsTime, lengthTime, onlyRunTime;
 
@@ -95,24 +84,23 @@ namespace ta {
         RetrievalArguments(col_type colnum, VectorMatrix& queryMatrix, VectorMatrix& probeMatrix, LEMP_Method method,
                 bool forCosine = true) :
         colnum(colnum), comparisons(0), probeMatrix(&probeMatrix), queryMatrix(&queryMatrix), forCosine(forCosine), method(method),
-        boundsTime(0), ipTime(0), scanTime(0), preprocessTime(0), filterTime(0), initializeListsTime(0), lengthTime(0), state(0),
-        prevList(-1), threads(1), worstMinScore(std::numeric_limits<double>::max()), //startPosOfPrevBucket(0),
-        competitorMethod(0), //rig(NULL), r(NULL), 
-        onlyRunTime(0) {
+        boundsTime(0), ipTime(0), scanTime(0), preprocessTime(0), filterTime(0), initializeListsTime(0), lengthTime(0), state(0),tanraState(0),
+        prevBucketBestPhi(-1), threads(1), worstMinScore(std::numeric_limits<double>::max()), 
+        competitorMethod(0), onlyRunTime(0), sketches(0){//, rig(NULL) {
             random = rg::Random32(123); // PSEUDO-RANDOM
 
         }
 
         inline RetrievalArguments() : comparisons(0), forCosine(true), boundsTime(0), ipTime(0), scanTime(0),
-        preprocessTime(0), filterTime(0), initializeListsTime(0), lengthTime(0), state(0),
-        prevList(-1), threads(1), colnum(0), queryMatrix(0), probeMatrix(0), competitorMethod(0), onlyRunTime(0) {
+        preprocessTime(0), filterTime(0), initializeListsTime(0), lengthTime(0), state(0),tanraState(0),
+        prevBucketBestPhi(-1), threads(1), colnum(0), queryMatrix(0), probeMatrix(0), competitorMethod(0), onlyRunTime(0), sketches(0){//, rig(NULL) {
             random = rg::Random32(123);
         }
 
         inline void initializeBasics(
                 VectorMatrix& queryMatrix1, VectorMatrix& probeMatrix1,
                 LEMP_Method method1, double theta1, int k1,
-                int threads1, double epsilon1, int numClusters1, bool forCosine1 = true) {
+                int threads1, double epsilon1, double gamma1, bool forCosine1 = true) {
 
             queryMatrix = &queryMatrix1;
             probeMatrix = &probeMatrix1;
@@ -125,15 +113,15 @@ namespace ta {
             k = k1;
             threads = threads1;
             epsilon = epsilon1;
-            
-            numClusters = numClusters1;
+            gamma = gamma1;     
+
         }
 
         RetrievalArguments(RetrievalArguments* other) : boundsTime(0), ipTime(0), scanTime(0), preprocessTime(0), filterTime(0),
-        initializeListsTime(0), lengthTime(0), state(0), prevList(-1), comparisons(0), probeMatrix(other->probeMatrix),
+        initializeListsTime(0), lengthTime(0), state(0), tanraState(0),prevBucketBestPhi(-1), comparisons(0), probeMatrix(other->probeMatrix),
         queryMatrix(other->queryMatrix), forCosine(other->forCosine), theta(other->theta), k(other->k), colnum(other->colnum),
         maxLists(other->maxLists), method(other->method), threads(other->threads), // startPosOfPrevBucket(0),
-        competitorMethod(0), worstMinScore(std::numeric_limits<double>::max()), onlyRunTime(0), epsilon(other->epsilon){
+        competitorMethod(0), worstMinScore(std::numeric_limits<double>::max()), onlyRunTime(0), epsilon(other->epsilon), gamma(other->gamma) {
             random = rg::Random32(123); // PSEUDO-RANDOM
 
             intervals.resize(other->intervals.size());
@@ -142,45 +130,53 @@ namespace ta {
             cp_array.resize(other->cp_array.size());
             ext_cp_array.resize(other->ext_cp_array.size());
 
-//             accum.resize(other->accum.size(), -1);
-//             hashlen.resize(other->hashlen.size());
-//             hashval.resize(other->hashval.size(), 0);
-//             hashwgt.resize(other->hashwgt.size());
-// 
-//             done.resize(other->done.size());
+            accum.resize(other->accum.size(), -1);
+            hashlen.resize(other->hashlen.size());
+            hashval.resize(other->hashval.size(), 0);
+            hashwgt.resize(other->hashwgt.size());
 
-
-
+            done.resize(other->done.size());
 
             if (other->state != 0) {
                 state = new TAState(colnum);
             }
+            
+            if (other->tanraState != 0) {
+                tanraState = new TANRAState(colnum);
+            }
+            
 
-//             if (other->rig != NULL) {
-//                 setupSketches();
+//             if (other->rig != NULL && method == LEMP_LSH ) {
+//                 rig = new RandomIntGaussians(colnum, LSH_SIGNATURES * LSH_CODE_LENGTH);
+//                 sums.resize(LSH_SIGNATURES * LSH_CODE_LENGTH, 0);
+//                 if (LSH_CODE_LENGTH == 8)
+//                     countsOfBlockValues.resize(256, 0);
 //             }
 // 
 //             if (method == LEMP_LSH) {
 //                 //copy
-//                 std::copy(other->thetaForActiveBlocks.begin() , other->thetaForActiveBlocks.end(), thetaForActiveBlocks.begin());
-//                 sketches.resize(other->sketches.size(),0);
+//                 std::copy(other->thetaForActiveBlocks.begin(), other->thetaForActiveBlocks.end(), thetaForActiveBlocks.begin());
+//                 sketches = 0;          
 //             }
-
         }
 
         ~RetrievalArguments() {
             if (state != 0) {
                 delete state;
             }
+            
+            if (tanraState != 0) {
+                delete tanraState;
+            }
 
-//             if (method == LEMP_BLSH || method == LEMP_LSH) {
-//                 rig->r = NULL;
-// //                 gsl_rng_free(r);
-//                 gk_free((void**) &(rig->i2fCache), &(rig->intGaussians), &rig, LTERM);
+//             if (method == LEMP_LSH) {
+//                 if (sketches)
+//                     delete[] sketches;
+// 
+//                 if (rig)
+//                     delete rig;
 // 
 //             }
-
-
         }
 
         inline void clear() {
@@ -193,7 +189,6 @@ namespace ta {
             onlyRunTime = 0;
             initializeListsTime = 0;
             comparisons = 0;
-
             results.clear();
         }
 
@@ -206,77 +201,45 @@ namespace ta {
             std::copy(heap.begin(), heap.end(), topkResults.begin() + p);
         }
 
-//         inline void setupSketches() {
-// 
-//             int nHashBits = LSH_SIGNATURES * 8;
-//             sums.resize(nHashBits, 0);
-//             countsOfBlockValues.resize(256, 0);
-//             int i, j, range;
-//             float *i2fCache;
-// 
-//             // set up rig and sketch parameters & temp memory
-// 
-//             rig = (da_rig_t*) gk_malloc(sizeof (da_rig_t), NULL); //"allocateBayesLSHMemory: rig"
-//             r = gsl_rng_alloc(gsl_rng_taus2);
-//             gsl_rng_set(r, 123); // I just put something
-// 
-//             range = rig->range = 16;
-//             rig->leftLimit = (0 - range) / 2.0;
-//             rig->rightLimit = rig->leftLimit + range;
-//             rig->f2iFactor = F2I2F * 1.0 / range;
-//             rig->i2fFactor = range * 1.0 / F2I2F;
-//             rig->r = r;
-//             rig->size = colnum * nHashBits;
-//             rig->intGaussians = da_ui16malloc(rig->size, NULL); //"setupSketches: rig->intGaussians"
-//             i2fCache = rig->i2fCache = da_fmalloc(F2I2F + 1, NULL); //"setupSketches: rig->i2fCache"
-// 
-//             // cache conversion values between int16 and float
-//             for (i2fCache[0] = rig->leftLimit, i = 1; i <= F2I2F; i++)
-//                 i2fCache[i] = i2fCache[i - 1] + rig->i2fFactor;
-// 
-//             // generate random vectors
-//             fillRig(rig);
-//         }
 
-//         inline void initThetaForActiveBlocks() {
-//             thetaForActiveBlocks.resize(LSH_SIGNATURES);
-//             double logNom = log(epsilon);
-//             double exponent = 0.125; // 1/8
-// 
-//             for (int b = 0; b < LSH_SIGNATURES; b++) {
-//                 double logDenom = logNom / (b+1);
-//                 double denom = exp(logDenom);
-//                 double thres8 = 1 - denom;            
-//                 double thres = pow(thres8, exponent);
-//                 double acosThres = (1 - thres)* PI;
-//                 double theta = cos(acosThres);
-//                 
-//                 thetaForActiveBlocks[b].data = theta;
-//                 thetaForActiveBlocks[b].id = b+1;
-//                 
-// //                std::cout<<"b: "<<b+1<<"-->"<<theta<<std::endl;
-// 
-//             }
-//             std::sort(thetaForActiveBlocks.begin(), thetaForActiveBlocks.end(), std::less<QueueElement>());
-//             
-//         }
-//         inline int findActiveBlocks(double theta){
-//             std::vector<QueueElement>::iterator it = std::upper_bound(thetaForActiveBlocks.begin(), thetaForActiveBlocks.end(), QueueElement(theta,0));
-//             
-//             int pos =   it - thetaForActiveBlocks.begin();   
-//             if (pos >= thetaForActiveBlocks.size()){
-//                 pos = thetaForActiveBlocks.size()-1;
-//                 return thetaForActiveBlocks[pos].id;
-//             }
-//                 
-//             int b =  thetaForActiveBlocks[pos].id +1; 
-//             return b;
-//         
-//         }
+        inline void initThetaForActiveBlocks() {
+            thetaForActiveBlocks.resize(LSH_SIGNATURES);
+            double logNom = log(epsilon);
+            double exponent = 1/((double) LSH_CODE_LENGTH);//0.125; // 1/8 LSH_CODE_LENGTH
+
+            for (int b = 0; b < LSH_SIGNATURES; b++) {
+                double logDenom = logNom / (b + 1);
+                double denom = exp(logDenom);
+                double thres8 = 1 - denom;
+                double thres = pow(thres8, exponent);
+                double acosThres = (1 - thres) * PI;
+                double theta = cos(acosThres);
+
+                thetaForActiveBlocks[b].data = theta;
+                thetaForActiveBlocks[b].id = b + 1;
+            }
+            std::sort(thetaForActiveBlocks.begin(), thetaForActiveBlocks.end(), std::less<QueueElement>());
+
+        }
+
+        inline int findActiveBlocks(double theta) {
+            std::vector<QueueElement>::iterator it = std::upper_bound(thetaForActiveBlocks.begin(), thetaForActiveBlocks.end(), QueueElement(theta, 0));
+
+            int pos = it - thetaForActiveBlocks.begin();
+            if (pos >= thetaForActiveBlocks.size()) {
+                pos = thetaForActiveBlocks.size() - 1;
+                return thetaForActiveBlocks[pos].id;
+            }
+
+            int b = thetaForActiveBlocks[pos].id + 1;
+
+            return b;
+
+        }
 
         inline void init(row_type maxProbeBucketSize) {
 
-            if (method == LEMP_LI || method == LEMP_I || method == LEMP_NB) {
+            if (method == LEMP_LI || method == LEMP_I) {
                 ext_cp_array.reserve(maxProbeBucketSize + 1);
                 ext_cp_array.resize(maxProbeBucketSize);
             }
@@ -285,20 +248,18 @@ namespace ta {
             //maxProbeBucketSize = maxBucketSize;
             if (method == LEMP_LI || method == LEMP_I ||
                     method == LEMP_LC || method == LEMP_C ||
-                    method == LEMP_AP || method == LEMP_NB ||
-                    method == LEMP_BLSH || method == LEMP_LSH) {
+                    method == LEMP_AP ||
+                    method == LEMP_LSH ) {
                 candidatesToVerify.reserve(maxProbeBucketSize + 2);
                 candidatesToVerify.resize(maxProbeBucketSize);
             }
 
-//             if (method == LEMP_AP) {
-//                 accum.resize(maxProbeBucketSize, -1);
-//                 hashlen.resize(colnum);
-//                 hashval.resize(colnum, 0);
-//                 hashwgt.resize(colnum);
-//             }
-
-
+            if (method == LEMP_AP) {
+                accum.resize(maxProbeBucketSize, -1);
+                hashlen.resize(colnum);
+                hashval.resize(colnum, 0);
+                hashwgt.resize(colnum);
+            }
 
             if (method == LEMP_LC || method == LEMP_C) {
                 cp_array.resize(maxProbeBucketSize);
@@ -307,16 +268,35 @@ namespace ta {
             if (method == LEMP_TA) {
                 state = new TAState(colnum);
             }
-
-//             if (method == LEMP_BLSH || method == LEMP_LSH) {
-//                 setupSketches();
-//             }
+            
+            if (method == LEMP_TANRA) {
+                tanraState = new TANRAState(colnum);
+                candidatesToVerify.resize(maxProbeBucketSize);
+            }
+            
+            
 
 //             if (method == LEMP_LSH) {
+//                 //                setupSketches(LSH_SIGNATURES, 8);
+//                 rig = new RandomIntGaussians(colnum, LSH_SIGNATURES * LSH_CODE_LENGTH);
 //                 done.resize(maxProbeBucketSize);
-//                 initThetaForActiveBlocks();
-//                 sketches.resize(maxProbeBucketSize * LSH_SIGNATURES, 0);
+//                 
+// 		
+// 		if(forCosine){
+// 			initThetaForActiveBlocks();
+// 			long long totalSketchSize = ((long)maxProbeBucketSize) * (LSH_CODE_LENGTH/8) * 	((long)LSH_SIGNATURES);
+// 			sketches = new uint8_t[totalSketchSize]();
+// 		}else{ // forCosine=false here means that I am running the simple-LSH therefore I will try to reduce the cost of LSH signature creation
+// 		  	long long totalSketchSize = (LSH_CODE_LENGTH/8) * ((long)LSH_SIGNATURES);
+// 			sketches = new uint8_t[totalSketchSize]();	
+// 		}
+// 
+//                 sums.resize(LSH_SIGNATURES * LSH_CODE_LENGTH, 0);		
+//                 if (LSH_CODE_LENGTH == 8)
+//                     countsOfBlockValues.resize(256, 0);
+// 
 //             }
+
         }
 
         inline void setIntervals(col_type lists) {
@@ -352,5 +332,5 @@ namespace ta {
 
 
 }
+#endif	/* RETRIEVALARGUMENTS2_H */
 
-#endif /* RETRIEVALARGUMENTS_H_ */

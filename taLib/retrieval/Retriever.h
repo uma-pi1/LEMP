@@ -54,7 +54,6 @@ namespace ta {
                     time += method1[i];
                 }
             } else {
-                //std::cout<<"I should not be here"<<std::endl;
                 time -= method1[cutoffSample - 1];
                 time += method2[cutoffSample - 1]; // other can be LENGTH for example
             }
@@ -105,68 +104,12 @@ namespace ta {
             exit(1);
         }
 
-        // this is to be used only by the 1st bucket in Row-Top-k. It just initializes the top-k elements
-
         inline virtual void runTopK(QueryBucket_withTuning& queryBatch,
                 ProbeBucket& probeBucket, RetrievalArguments* arg) {
-
-            //            QueueElement* point = &(arg->topkResults[queryBatch.startPos * arg->k]);
-            //            row_type p = 0;
-            //
-            //            for (row_type i = queryBatch.startPos; i < queryBatch.endPos; i++) {
-            //
-            //                const double* query = arg->queryMatrix->getMatrixRowPtr(i);
-            //                arg->queryId = arg->queryMatrix->getId(i);
-            //
-            //
-            //                for (row_type j = probeBucket.startPos; j < probeBucket.endPos; j++) {
-            //                    arg->comparisons++;
-            //                    double ip = arg->probeMatrix->innerProduct(j, query);
-            //
-            //                    point[p] = QueueElement(ip, arg->probeMatrix->getId(j));
-            //                    p++;
-            //
-            //                    if (arg->worstMinScore > ip) {
-            //                        arg->worstMinScore = ip;
-            //                    }
-            //
-            //                }
-            //            }
-
-            ////////////////
-            row_type user = queryBatch.startPos;
-            int start = queryBatch.startPos * arg->k;
-            int end = queryBatch.endPos * arg->k;
-            for (row_type i = start; i < end; i += arg->k) {
-
-                const double* query = arg->queryMatrix->getMatrixRowPtr(user);
-
-                arg->queryId = arg->queryMatrix->getId(user);
-
-                for (row_type j = probeBucket.startPos; j < probeBucket.endPos; j++) {
-                    arg->comparisons++;
-                    double ip = arg->probeMatrix->innerProduct(j, query);
-
-                    arg->heap[j] = QueueElement(ip, arg->probeMatrix->getId(j));
-
-
-
-
-                }
-                std::make_heap(arg->heap.begin(), arg->heap.end(), std::greater<QueueElement>());
-
-
-                if (arg->worstMinScore > arg->heap.front().data) {
-                    arg->worstMinScore = arg->heap.front().data;
-                }
-
-                arg->writeHeapToTopk(user);
-
-                user++;
-            }
-
-            //////////////
+            std::cerr << "Error! You shouldn't have called that" << std::endl;
+            exit(1);
         }
+        // this is to be used only by the 1st bucket in Row-Top-k. It just initializes the top-k elements
 
         inline virtual void runTopK(ProbeBucket& probeBucket, RetrievalArguments* arg) {
 
@@ -215,6 +158,8 @@ namespace ta {
             row_type sampleSize;
             // find the queries
             double thresForQ = probeBucket.bucketScanThreshold;
+            
+            // first find how many queries in total will be fired in this Above-theta problem
             std::vector<row_type> activeQueries(retrArg.size());
 
             for (int t = 0; t < retrArg.size(); t++) {
@@ -225,7 +170,7 @@ namespace ta {
                 probeBucket.activeQueries += activeQueries[t];
             }
 
-
+            // and based on the number of active queries pick up a good sample size
             if (probeBucket.activeQueries < LOWER_LIMIT_PER_BUCKET * 3) {
                 sampleSize = 0;
             } else {
@@ -248,8 +193,10 @@ namespace ta {
                 sampleSize /= retrArg.size();
 
                 for (int t = 0; t < retrArg.size(); t++) {
+                    // do the actual sampling
                     std::vector<row_type> sampleIndx = rg::sample(random, sampleSize, activeQueries[t]);
 
+                    // calculate the actual theta_b(q)) values
                     for (row_type i = 0; i < sampleIndx.size(); i++) {
                         double theta_b_q = probeBucket.bucketScanThreshold / retrArg[t].queryMatrix->getVectorLength(sampleIndx[i]);
                         xValues->push_back(MatItem(theta_b_q, t, sampleIndx[i]));
@@ -265,9 +212,14 @@ namespace ta {
         }
 
         inline virtual void tuneTopk(ProbeBucket& probeBucket, std::vector<RetrievalArguments>& retrArg) {
+            std::cerr << "Error! You shouldn't have called that" << std::endl;
+            exit(1);
         }
 
         inline void setup_xValues_topk(ProbeBucket& probeBucket, std::vector<RetrievalArguments>& retrArg) {
+            // for the Row-Top-k we already have the sample of queries, 
+            // but the order of sample queries on the x-axis (theta_b(q)) is changing from bucket to bucket
+            
             xValues_ptr ptr(new std::vector<MatItem>());
             xValues = ptr;
             row_type b = retrArg[0].bucketInd;
@@ -366,11 +318,24 @@ namespace ta {
         inline void lengthTopk(const double *query, row_type start, row_type end, RetrievalArguments* arg) {
 
             double minScore = arg->heap.front().data;
+
+            double minScoreAppr = minScore;
+
+#ifdef RELATIVE_APPROX
+            minScoreAppr *= arg->currGammaAppr;
+#else 
+#ifdef ABS_APPROX             
+            minScoreAppr += arg->currGammaAppr;
+#endif
+#endif
+
             for (row_type j = start; j < end; j++) {
 
                 double* item = arg->probeMatrix->getMatrixRowPtr(j);
 
-                if (item[-1] < minScore) { // stop scanning for this user
+
+
+                if (item[-1] < minScoreAppr) { // stop scanning for this user
                     break;
                 }
                 arg->comparisons++;
@@ -384,6 +349,17 @@ namespace ta {
                     arg->heap.push_back(QueueElement(ip, arg->probeMatrix->getId(j)));
                     std::push_heap(arg->heap.begin(), arg->heap.end(), std::greater<QueueElement>());
                     minScore = arg->heap.front().data;
+
+                    minScoreAppr = minScore;
+
+#ifdef RELATIVE_APPROX
+                    minScoreAppr *= arg->currGammaAppr;
+#else 
+#ifdef         ABS_APPROX             
+                    minScoreAppr += arg->currGammaAppr;
+#endif
+#endif
+
                 }
             }
 
@@ -462,13 +438,25 @@ namespace ta {
                 const double* query = arg->queryMatrix->getMatrixRowPtr(user);
 
                 double minScore = arg->topkResults[i].data;
+                double minScoreAppr = minScore;
 
-                //                arg->moveTopkToHeap(i);
+#ifdef RELATIVE_APPROX
+                if (minScoreAppr >= 0) {
+                    minScoreAppr *= (1 + arg->gamma);
+                    arg->currGammaAppr = (1 + arg->gamma);
+                } else {
+                    minScoreAppr *= (1 - arg->gamma);
+                    arg->currGammaAppr = (1 - arg->gamma);
+                }
+#else 
+#ifdef         ABS_APPROX             
+                minScoreAppr += arg->queryMatrix->gammaEquivalents[user];
+                arg->currGammaAppr = arg->queryMatrix->gammaEquivalents[user];
+#endif
+#endif
 
-                // get the minScore
-                //                double minScore = arg->heap.front().data;
 
-                if (probeBucket.normL2.second < minScore) {// skip this bucket and all other buckets
+                if (probeBucket.normL2.second < minScoreAppr) {// skip this bucket and all other buckets
                     queryBatch.inactiveQueries[user - queryBatch.startPos] = true;
                     queryBatch.inactiveCounter++;
                     user++;
@@ -520,8 +508,25 @@ namespace ta {
                     const double* query = arg->queryMatrix->getMatrixRowPtr(user);
 
                     double minScore = arg->topkResults[i].data;
+                    double minScoreAppr = minScore;
 
-                    if (probeBucket.normL2.second < minScore) {// skip this bucket and all other buckets
+#ifdef RELATIVE_APPROX
+                    if (minScoreAppr >= 0) {
+                        minScoreAppr *= (1 + arg->gamma);
+                        arg->currGammaAppr = (1 + arg->gamma);
+                    } else {
+                        minScoreAppr *= (1 - arg->gamma);
+                        arg->currGammaAppr = (1 - arg->gamma);
+                    }
+#else 
+#ifdef         ABS_APPROX             
+                    minScoreAppr += arg->queryMatrix->gammaEquivalents[user];
+                    arg->currGammaAppr = arg->queryMatrix->gammaEquivalents[user];
+#endif
+#endif
+
+
+                    if (probeBucket.normL2.second < minScoreAppr) {// skip this bucket and all other buckets
                         queryBatch.inactiveQueries[user - queryBatch.startPos] = true;
                         queryBatch.inactiveCounter++;
                         user++;
@@ -605,7 +610,7 @@ namespace ta {
 
         inline virtual void tuneTopk(ProbeBucket& probeBucket, std::vector<RetrievalArguments>& retrArg) {
         }
-   };
+    };
 
 
 

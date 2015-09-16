@@ -38,6 +38,7 @@ namespace ta {
 
         LengthRetriever plainRetriever;
 
+        // calculate how large the sample should be
         row_type sampleSize = 0;
         for (int t = 0; t < retrArg.size(); t++) {
             sampleSize += retrArg[t].queryMatrix->rowNum;
@@ -58,20 +59,23 @@ namespace ta {
         retrArg[0].heap.resize(retrArg[0].k);
 
 
-
+        // from the query matrix that corresponds to each thread...
         for (int t = 0; t < retrArg.size(); t++) {
 
+            //... get a sample
             std::vector<row_type> sampleIndx = rg::sample(random, sampleSize, retrArg[t].queryMatrix->rowNum);
 
 
-            for (int i = 0; i < sampleSize; i++) {
+            for (int i = 0; i < sampleSize; i++) {// for each sample query
                 id = sampleIndx[i];
-
-
 
                 const double* query = retrArg[t].queryMatrix->getMatrixRowPtr(id);
 
+                // I will need to keep track of the topk results of each query for each bucket. The kth value in the topk list will give me the theta_b(q))
+                // that corresponds to this query
+                // I keep this info in the retrArg because it will be needed later in the ListsTuneData.h
                 retrArg[0].globalData[0][t][id] = GlobalTopkTuneData();
+
 
                 for (row_type j = probeBuckets[0].startPos; j < probeBuckets[0].endPos; j++) {
                     double ip = retrArg[0].probeMatrix->innerProduct(j, query);
@@ -88,7 +92,7 @@ namespace ta {
                     if (prevResults.front().data >= probeBuckets[b].normL2.second) { // bucket check
                         break;
 
-                    } else {
+                    } else {// run LENGTH and measure the time
 
                         if (retrArg[0].globalData[b].size() == 0) {
                             retrArg[0].globalData[b].resize(retrArg.size());
@@ -122,7 +126,7 @@ namespace ta {
             }
             if (counter >= LOWER_LIMIT_PER_BUCKET) {
                 activeBuckets++;
-            } else {
+            } else { // if I do not have enough sample queries for a bucket, it makes no sense to try  to tune
                 break;
             }
 
@@ -130,12 +134,9 @@ namespace ta {
         activeBuckets++;
         bucketsForInit++;
 
-        //        std::cout<<"activeBuckets: "<<activeBuckets<<" bucketsForInit: "<<bucketsForInit<<std::endl;
 
-        p.first = activeBuckets;
-        p.second = bucketsForInit;
-
-        //        std::cout << "size 0: " << retrArg[0].globalData[0][0].size() << " size activeBuckets: " << retrArg[0].globalData[activeBuckets - 1][0].size() << std::endl;
+        p.first = activeBuckets; // I will try to tune t_b, phi for all these buckets
+        p.second = bucketsForInit;// I will create indexes for all these buckets (in multi-threaded it is better to create indexes before you enter the retrieval phase)
 
 
         return p;

@@ -22,63 +22,48 @@
 #ifndef QUERYBATCH_H_
 #define QUERYBATCH_H_
 
-// #include <taLib/ap/includes.h>
-// #include <taLib/ap/connect.h>
-
-
 namespace ta {
 
     double matrixToMatrixTime2 = 0;
 
+
     class QueryBucket_withTuning {
         col_type* queues;
-        col_type maxListsInPrevRound;
 
 
     public:
 
 //         LshIndex * lshIndex;
-//         BlshIndex * blshIndex;
         row_type startPos, endPos, rowNum;
         row_type inactiveCounter;
         bool initializedQueues;
         std::vector<bool> inactiveQueries;
         std::pair<double, double> normL2; // first: min second: max
-
+        
 
         inline void preprocess(const VectorMatrix& userMatrix, col_type maxLists);
-        inline void preprocess(const VectorMatrix& userMatrix, col_type maxLists, row_type j);
-
 
         inline col_type* getQueue(row_type user, col_type maxLists) const {
             return &queues[user * maxLists];
         }
+  
 
 //         inline void createLshIndex(const VectorMatrix& matrix) {
 //             lshIndex = new LshIndex();
 //             lshIndex->initializeLists(matrix, false, startPos, endPos);
 //         }
-// 
-//         inline void createBlshIndex(const VectorMatrix& matrix, double worstCaseTheta, std::vector<float>& sums, da_rig_t *rig, double epsilon) {
-//             blshIndex = new BlshIndex(epsilon);
-//             blshIndex->initializeLists(matrix, worstCaseTheta, false, sums, rig, startPos, endPos);
-//         }
 
-        inline QueryBucket_withTuning() : initializedQueues(false), maxListsInPrevRound(0), queues(0),
-        inactiveCounter(0)//, lshIndex(NULL), blshIndex(NULL) 
-	{};
+
+        inline QueryBucket_withTuning() : initializedQueues(false), queues(0),
+        inactiveCounter(0){//,  lshIndex(NULL){
+        };
 
         inline ~QueryBucket_withTuning() {
-
             if (queues != NULL)
                 delete[] queues;
 
 //             if (lshIndex != NULL)
 //                 delete lshIndex;
-// 
-//             if (blshIndex != NULL)
-//                 delete blshIndex;
-
         }
 
         inline void init(const VectorMatrix& matrix, row_type startInd, row_type endInd, LEMPArg& args) {
@@ -98,7 +83,6 @@ namespace ta {
     inline void QueryBucket_withTuning::preprocess(const VectorMatrix& userMatrix, col_type maxLists) {
 
         queues = new col_type[rowNum * maxLists];
-
 
         std::vector<QueueElement> tmp;
         tmp.resize(maxLists);
@@ -130,6 +114,7 @@ namespace ta {
                 queues[j * maxLists + i] = tmp[i].id;
             }
         }
+
     }
 
 }

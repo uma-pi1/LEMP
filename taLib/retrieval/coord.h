@@ -342,11 +342,6 @@ namespace ta {
 
                     double minScore = arg->topkResults[i].data;
 
-                    //                    arg->moveTopkToHeap(i);
-
-                    // get the minScore
-                    //                    double minScore = arg->heap.front().data;
-
                     if (probeBucket.normL2.second < minScore) {// skip this bucket and all other buckets
                         queryBatch.inactiveQueries[user - queryBatch.startPos] = true;
                         queryBatch.inactiveCounter++;

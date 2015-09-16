@@ -87,25 +87,8 @@ namespace ta {
                 cacheSizeInKB -= LSH_SIGNATURES * 257 * row_typeSize;
                 singleVectorSpace += row_typeSize; // for the candidatesToVerify
 
-                //                break;
-            case LEMP_BLSH:
-                singleVectorSpace += row_typeSize * LSH_SIGNATURES; // for the sketches
-                singleVectorSpace += row_typeSize; // for the candidatesToVerify
                 break;
 
-            case LEMP_NB:
-                singleVectorSpace += row_typeSize; // for the candidatesToVerify
-                singleVectorSpace += (doubleSize + doubleSize); // for the ext_cp_array
-                singleVectorSpace += (doubleSize + row_typeSize) * rank; // index space
-                
-//                singleVectorSpace += 5 * row_typeSize; // scale, start, end, point, numDescendants
-//                singleVectorSpace += 3 * row_typeSize; // & dataset, parent, child 
-//                singleVectorSpace += 3 * doubleSize; // base, parentDistance, furtherDistance
-//                singleVectorSpace += args.threads * (3 * doubleSize + 2 * row_typeSize); // stats
-//                singleVectorSpace += row_typeSize * LSH_SIGNATURES;
-//                cacheSizeInKB -= LSH_SIGNATURES * 257 * row_typeSize;
-
-                break;
 
         }
 
@@ -178,17 +161,10 @@ namespace ta {
             case LEMP_LC:
                 singleVectorSpace += rank * col_typeSize; // queue
                 break;
-
-            case LEMP_BLSH:
-            case LEMP_LSH:
-                
+            case LEMP_LSH:                
                 singleVectorSpace += row_typeSize * LSH_SIGNATURES; // for the sketches
                 break;
-                
-            case LEMP_NB:
-                singleVectorSpace += rank * col_typeSize; // queue
-//                singleVectorSpace += row_typeSize * LSH_SIGNATURES; // for the sketches                
-                break;
+
         }
 
         row_type maxItems = cacheSizeInKB / singleVectorSpace;
@@ -198,6 +174,7 @@ namespace ta {
         int blocks = ceil((double) size / maxItems);
 	
 // 	blocks = 1;///////////////////////
+	
 
         computeDefaultBlockOffsets(size, blocks, blockOffsets);
 

@@ -38,14 +38,12 @@ namespace ta {
 
         std::vector<ProbeBucket> probeBuckets;
         std::vector<RetrievalArguments> retrArg; //one argument for each thread
-//         std::vector<Centroid> centroids;
-        std::vector<int> clusterIds;
-
+      
         row_type maxProbeBucketSize;
         LEMPArg args;
         std::ofstream logging;
         row_type activeBuckets;
-       
+
         inline row_type initProbeBuckets(VectorMatrix& rightMatrix);
         inline void initializeRetrievers();
         inline void initQueryBatches(VectorMatrix& leftMatrix, row_type maxBlockSize);
@@ -108,28 +106,21 @@ namespace ta {
                     logging << "LEMP_TA";
                     std::cout << "ALGO: LEMP_TA" << std::endl;
                     break;
-//                 case LEMP_TREE:
-//                     logging << "LEMP_TREE"; // my parallelization could lead to false sharing
-//                     std::cout << "ALGO: LEMP_TREE" << std::endl;
-//                     break;
-//                 case LEMP_AP:
-//                     logging << "LEMP_AP";
-//                     std::cout << "ALGO: LEMP_AP" << std::endl;
-//                     break;
-//                 case LEMP_BLSH:
-//                     logging << "LEMP_BLSH";
-//                     std::cout << "ALGO: LEMP_BLSH" << std::endl;
-//                     std::cout << "BLSH signatures: " << BLSH_SIGNATURES << std::endl;
-//                     std::cout << "Epsilon: " << args.epsilon << std::endl;
-//                     gsl_set_error_handler_off();
-//                     break;
-//                 case LEMP_LSH:
-//                     logging << "LEMP_LSH";
-//                     std::cout << "ALGO: LEMP_LSH" << std::endl;
-//                     std::cout << "Max LSH signatures: " << LSH_SIGNATURES << std::endl;
-//                     std::cout << "Epsilon: " << args.epsilon << std::endl;
-//                     gsl_set_error_handler_off();
-//                     break;
+                case LEMP_TREE:
+                    logging << "LEMP_TREE"; // my parallelization could lead to false sharing
+                    std::cout << "ALGO: LEMP_TREE" << std::endl;
+                    break;
+                case LEMP_AP:
+                    logging << "LEMP_AP";
+                    std::cout << "ALGO: LEMP_AP" << std::endl;
+                    break;
+                case LEMP_LSH:
+                    logging << "LEMP_LSH";
+                    std::cout << "ALGO: LEMP_LSH" << std::endl;
+                    std::cout << "Max LSH signatures: " << LSH_SIGNATURES << std::endl;
+                    std::cout << "Recall rate: " << 1 - args.epsilon << std::endl;
+//                    gsl_set_error_handler_off();
+                    break;
             }
 
 
@@ -156,7 +147,7 @@ namespace ta {
             }
 
             t.stop();
-            Algo_withTuning::args.dataManipulationTime += t.elapsedTime().nanos();           
+            Algo_withTuning::args.dataManipulationTime += t.elapsedTime().nanos();
 
         }
 
@@ -179,7 +170,7 @@ namespace ta {
 
             tune();
 
-
+            std::cout << "dataManipulationTime: " << Algo_withTuning::args.dataManipulationTime / 1E9 << std::endl;
             std::cout << "Multiplication starts! theta: " << args.theta << std::endl;
 
 
@@ -192,7 +183,6 @@ namespace ta {
                 case LEMP_LI:
                 case LEMP_C:
                 case LEMP_LC:
-                case LEMP_NB:
 
                     for (row_type b = 0; b < activeBuckets; b++) {
 
@@ -243,10 +233,10 @@ namespace ta {
 
             logging << "\t" << args.theta << "\t" << comparisons << "\t" << totalSize << "\t";
             printTimes(t);
-	    
-	    if(args.resultsFile != ""){
-                 writeResults(results, args.resultsFile);
-	    }
+
+            if (args.resultsFile != "") {
+                writeResults(results, args.resultsFile);
+            }
 
 
             logging.close();
@@ -270,7 +260,7 @@ namespace ta {
 
             tune();
 
-
+            std::cout << "dataManipulationTime: " << Algo_withTuning::args.dataManipulationTime / 1E9 << std::endl;
             std::cout << "Multiplication starts! k: " << args.k << std::endl;
 
 
@@ -283,7 +273,6 @@ namespace ta {
                 case LEMP_LI:
                 case LEMP_C:
                 case LEMP_LC:
-                case LEMP_NB:
 
                     for (row_type b = 0; b < activeBuckets; b++) {
 
@@ -317,31 +306,33 @@ namespace ta {
 
                     probeBuckets[b].ptrRetriever->runTopK(probeBuckets[b], &retrArg[tid]);
 
-//                     if (args.method == LEMP_AP //|| args.method == LEMP_BLSH || args.method == LEMP_LSH		      
-// 		    ) { // synchronize the worstMinScore
-//                         // obviously you should avoid using these guys in a parallel setting
-// #pragma omp critical
-//                         {
-//                             if (worstMinScore > retrArg[tid].worstMinScore) {
-//                                 worstMinScore = retrArg[tid].worstMinScore;
-//                             }
-//                         }
-// #pragma omp barrier
-//                         retrArg[tid].worstMinScore = worstMinScore;
-// #pragma omp barrier
-//                         worstMinScore = std::numeric_limits<double>::max();
-// 
-//                     }
+                    if (args.method == LEMP_AP) { // synchronize the worstMinScore      
+
+                        // obviously you should avoid using these guys in a parallel setting
+#pragma omp critical
+                        {
+                            if (worstMinScore > retrArg[tid].worstMinScore) {
+                                worstMinScore = retrArg[tid].worstMinScore;
+                            }
+                        }
+#pragma omp barrier
+                        retrArg[tid].worstMinScore = worstMinScore;
+#pragma omp barrier
+                        worstMinScore = std::numeric_limits<double>::max();
+
+                    }
 
                 }
+                
+//                 std::cout<<"Done running thread: "<<tid<<std::endl;
 
                 localToGlobalIds(retrArg[tid].topkResults, args.k, retrArg[tid].results, queryMatrices[tid]);
                 results[tid] = &retrArg[tid].results;
-                
-                
 
-                comparisons += retrArg[tid].comparisons;
 
+
+		comparisons += retrArg[tid].comparisons;
+		
             }
 
 
@@ -354,10 +345,10 @@ namespace ta {
 
             logging << "\t" << args.k << "\t" << comparisons << "\t" << getResultSetSize() << "\t";
             printTimes(t);
-	    
-	    if(args.resultsFile != ""){
-                 writeResults(results, args.resultsFile);
-	    }
+
+            if (args.resultsFile != "") {
+                writeResults(results, args.resultsFile);
+            }
 
             logging.close();
         }
@@ -386,7 +377,7 @@ namespace ta {
     inline row_type Algo_withTuning::initProbeBuckets(VectorMatrix& rightMatrix) {
         std::vector<row_type> probeBucketOffsets;
 
-        probeMatrix.init(rightMatrix, true); // normalize and sort
+        probeMatrix.init(rightMatrix, true, false); // normalize and sort
 
         row_type maxBlockSize = computeBlockOffsetsByFactorCacheFittingForItems(probeMatrix.lengthInfo,
                 probeMatrix.rowNum, probeBucketOffsets, FACTOR, ITEMS_PER_BLOCK, args.cacheSizeinKB, probeMatrix.colNum, args);
@@ -412,7 +403,6 @@ namespace ta {
                     maxUserLength = queryMatrices[i].lengthInfo[0].data;
             }
 
-
             for (row_type i = 0; i < probeBuckets.size(); i++) {
                 probeBuckets[i].bucketScanThreshold = args.theta / probeBuckets[i].normL2.second;
 
@@ -432,8 +422,6 @@ namespace ta {
                     maxProbeBucketSize = probeBuckets[b].rowNum;
             }
             b0 = 1;
-
-
             retriever_ptr firstPtr(new Retriever());
             probeBuckets[0].ptrRetriever = firstPtr;
 
@@ -448,8 +436,8 @@ namespace ta {
                     if (probeBuckets[b].ptrIndexes[SL] == 0)
                         probeBuckets[b].ptrIndexes[SL] = new QueueElementLists();
                 }
-
                 break;
+                
             case LEMP_I:
 #pragma omp parallel for schedule(static,1)
                 for (row_type b = b0; b < activeBuckets; b++) {
@@ -458,8 +446,8 @@ namespace ta {
                     if (probeBuckets[b].ptrIndexes[SL] == 0)
                         probeBuckets[b].ptrIndexes[SL] = new QueueElementLists();
                 }
-
                 break;
+                
             case LEMP_LC:
 #pragma omp parallel for schedule(static,1)
                 for (row_type b = b0; b < activeBuckets; b++) {
@@ -468,7 +456,6 @@ namespace ta {
                     if (probeBuckets[b].ptrIndexes[INT_SL] == 0)
                         probeBuckets[b].ptrIndexes[INT_SL] = new IntLists();
                 }
-
                 break;
 
             case LEMP_C:
@@ -479,8 +466,8 @@ namespace ta {
                     if (probeBuckets[b].ptrIndexes[INT_SL] == 0)
                         probeBuckets[b].ptrIndexes[INT_SL] = new IntLists();
                 }
-
                 break;
+                
             case LEMP_TA:
 #pragma omp parallel for schedule(static,1)
                 for (row_type b = b0; b < activeBuckets; b++) {
@@ -490,6 +477,7 @@ namespace ta {
                         probeBuckets[b].ptrIndexes[SL] = new QueueElementLists();
                 }
                 break;
+                
             case LEMP_L:
 #pragma omp parallel for schedule(static,1)
                 for (row_type b = b0; b < activeBuckets; b++) {
@@ -498,38 +486,27 @@ namespace ta {
                 }
                 break;
 
-//             case LEMP_TREE:
-// #pragma omp parallel for schedule(static,1) 
-//                 for (row_type b = b0; b < activeBuckets; b++) {
-//                     retriever_ptr rPtr(new SingleTree());
-//                     probeBuckets[b].ptrRetriever = rPtr;
-//                     if (probeBuckets[b].ptrIndexes[TREE] == 0)
-//                         probeBuckets[b].ptrIndexes[TREE] = new TreeIndex();
-//                 }
-//                 break;
-// 
-//             case LEMP_AP:
-// #pragma omp parallel for schedule(static,1)
-//                 for (row_type b = b0; b < activeBuckets; b++) {
-//                     retriever_ptr rPtr(new apRetriever());
-//                     probeBuckets[b].ptrRetriever = rPtr;
-//                     if (probeBuckets[b].ptrIndexes[AP] == 0)
-//                         probeBuckets[b].ptrIndexes[AP] = new L2apIndex();
-//                 }
-//                 break;
+            case LEMP_TREE:
+#pragma omp parallel for schedule(static,1) 
+                for (row_type b = b0; b < activeBuckets; b++) {
+                    retriever_ptr rPtr(new SingleTree());
+                    probeBuckets[b].ptrRetriever = rPtr;
+                    if (probeBuckets[b].ptrIndexes[TREE] == 0)
+                        probeBuckets[b].ptrIndexes[TREE] = new TreeIndex();
+                }
+                break;
 
-//             case LEMP_BLSH:
-// #pragma omp parallel for schedule(static,1)
-//                 for (row_type b = b0; b < activeBuckets; b++) {
-//                     retriever_ptr rPtr(new BlshRetriever());
-//                     probeBuckets[b].ptrRetriever = rPtr;
-//                     if (probeBuckets[b].ptrIndexes[BLSH] == 0)
-//                         probeBuckets[b].ptrIndexes[BLSH] = new BlshIndex(args.epsilon);
-//                 }
-//                 break;
+            case LEMP_AP:
+#pragma omp parallel for schedule(static,1)
+                for (row_type b = b0; b < activeBuckets; b++) {
+                    retriever_ptr rPtr(new apRetriever());
+                    probeBuckets[b].ptrRetriever = rPtr;
+                    if (probeBuckets[b].ptrIndexes[AP] == 0)
+                        probeBuckets[b].ptrIndexes[AP] = new L2apIndex();
+                }
+                break;
+
 //             case LEMP_LSH:
-// 
-// 
 // #pragma omp parallel for schedule(static,1)
 //                 for (row_type b = b0; b < activeBuckets; b++) {
 //                     retriever_ptr rPtr(new LshRetriever());
@@ -545,11 +522,14 @@ namespace ta {
         std::vector<row_type> blockOffsets;
         row_type nCount = 0;
 
+
+
         if (args.k > 0) { // this is a top-k version
-            initializeMatricesForTopKPerUser(leftMatrix, queryMatrices); // normalize but don't sort
+            initializeMatrices(leftMatrix, queryMatrices, false, true, args.gamma); // normalize but don't sort
         } else {
-            initializeMatrices(leftMatrix, queryMatrices, true); // normalize and sort
+            initializeMatrices(leftMatrix, queryMatrices, true, false); // normalize and sort
         }
+
 
 #pragma omp parallel reduction(+ : nCount)
         {
@@ -559,7 +539,7 @@ namespace ta {
             bucketize(retrArg[tid].queryBatches, queryMatrices[tid], blockOffsets, args);
 
             nCount += retrArg[tid].queryBatches.size();
-            retrArg[tid].initializeBasics(queryMatrices[tid], probeMatrix, args.method, args.theta, args.k, args.threads, args.epsilon, args.numClusters);
+            retrArg[tid].initializeBasics(queryMatrices[tid], probeMatrix, args.method, args.theta, args.k, args.threads, args.epsilon, args.gamma);
 
         }
         logging << nCount << "\t";
@@ -575,8 +555,8 @@ namespace ta {
         std::cout << "Active Buckets used for index initialization: " << activeBuckets << std::endl;
         double worstCaseTheta;
 
-//         rg::Timer t1;
-//         t1.start();
+        rg::Timer t1;
+        t1.start();
         switch (args.method) {
             case LEMP_LI:
             case LEMP_I:
@@ -595,59 +575,48 @@ namespace ta {
                 }
                 break;
 
-//             case LEMP_TREE:
-// #pragma omp parallel for schedule(dynamic,1) 
-//                 for (row_type b = b0; b < activeBuckets; b++) {
-//                     static_cast<TreeIndex*> (probeBuckets[b].ptrIndexes[TREE])->initializeTree(probeMatrix, args.threads, probeBuckets[b].startPos, probeBuckets[b].endPos);
-//                 }
-//                 break;
-// 
-//             case LEMP_AP:
-//                 for (int i = 0; i < queryMatrices.size(); i++) {
-//                     if (maxQueryLength < queryMatrices[i].getVectorLength(0))
-//                         maxQueryLength = queryMatrices[i].getVectorLength(0);
-//                 }
-//                 worstCaseTheta = args.theta / maxQueryLength;
-// 
-// #pragma omp parallel for schedule(dynamic,1) 
-//                 for (row_type b = b0; b < activeBuckets; b++) {
-//                     static_cast<L2apIndex*> (probeBuckets[b].ptrIndexes[AP])->initializeLists(probeMatrix, worstCaseTheta, cweights,
-//                             probeBuckets[b].startPos, probeBuckets[b].endPos);
-//                 }
-//                 break;
+            case LEMP_TREE:
+#pragma omp parallel for schedule(dynamic,1) 
+                for (row_type b = b0; b < activeBuckets; b++) {
+                    static_cast<TreeIndex*> (probeBuckets[b].ptrIndexes[TREE])->initializeTree(probeMatrix, args.threads, probeBuckets[b].startPos, probeBuckets[b].endPos);
+                }
+                break;
 
-//             case LEMP_BLSH:
-//                 for (int i = 0; i < queryMatrices.size(); i++) {
-//                     if (maxQueryLength < queryMatrices[i].getVectorLength(0))
-//                         maxQueryLength = queryMatrices[i].getVectorLength(0);
-//                 }
-//                 worstCaseTheta = args.theta / maxQueryLength;
-// 
-// #pragma omp parallel 
-//             {
-//                 row_type tid = omp_get_thread_num();
-// 
-//                 for (row_type b = b0 + tid; b < activeBuckets; b += args.threads) {
-//                     static_cast<BlshIndex*> (probeBuckets[b].ptrIndexes[BLSH])->initializeLists(probeMatrix, worstCaseTheta, true, retrArg[tid].sums, retrArg[tid].rig, probeBuckets[b].startPos, probeBuckets[b].endPos);
-//                 }
-//             }
-// 
-//                 break;
-// 
-// 
+            case LEMP_AP:
+                for (int i = 0; i < queryMatrices.size(); i++) {
+                    if (maxQueryLength < queryMatrices[i].getVectorLength(0))
+                        maxQueryLength = queryMatrices[i].getVectorLength(0);
+                }
+                worstCaseTheta = args.theta / maxQueryLength;
+
+#pragma omp parallel for schedule(dynamic,1) 
+                for (row_type b = b0; b < activeBuckets; b++) {
+                    static_cast<L2apIndex*> (probeBuckets[b].ptrIndexes[AP])->initializeLists(probeMatrix, worstCaseTheta, cweights,
+                            probeBuckets[b].startPos, probeBuckets[b].endPos);
+                }
+                break;
+
 //             case LEMP_LSH:
+// 	      
 // 
 // #pragma omp parallel for schedule(dynamic,1) 
 //                 for (row_type b = b0; b < activeBuckets; b++) {
-//                     static_cast<LshIndex*> (probeBuckets[b].ptrIndexes[LSH])->initializeLists(probeMatrix, true, probeBuckets[b].startPos, probeBuckets[b].endPos);
+// 		     static_cast<LshIndex*> (probeBuckets[b].ptrIndexes[LSH])->initializeLists(probeMatrix, true, probeBuckets[b].startPos, probeBuckets[b].endPos);
+// 		     
+// 		     row_type signatures = LSH_SIGNATURES;//LSH_SIGNATURES/(b+1);
+// 		     if(retrArg.size() > 1 && signatures > 0){	
+// 			  row_type tid = omp_get_thread_num();
+// 
+// 			  static_cast<LshIndex*> (probeBuckets[b].ptrIndexes[LSH])->checkAndReallocateAll(&probeMatrix, true, probeBuckets[b].startPos, probeBuckets[b].endPos, signatures,
+//                                 retrArg[tid].sums, retrArg[tid].countsOfBlockValues, retrArg[tid].sketches, retrArg[tid].rig);
+// 		    }	     
 //                 }
-// 
-// 
+//                 
 //                 break;
-        }
-//         t1.stop();
-//         std::cout << "Time for initializing lists: " << t1 << std::endl;
 
+        }
+        t1.stop();
+        std::cout << "Time for initializing lists: " << t1 << std::endl;
 
 
     }
@@ -661,8 +630,6 @@ namespace ta {
                 case LEMP_LC:
                 case LEMP_C:
                 case LEMP_LSH:
-                case LEMP_NB:
-
 
                     if (args.k == 0) {
 
@@ -691,8 +658,7 @@ namespace ta {
                         t.start();
                         std::pair<row_type, row_type> p(probeBuckets.size(), probeBuckets.size());
 
-                        //                         if (args.method != LEMP_LSH) {
-                        p = findSampleForTuningTopk(probeBuckets,  retrArg);
+                        p = findSampleForTuningTopk(probeBuckets, retrArg);
 
                         activeBuckets = p.first;
 #pragma omp parallel for schedule(dynamic,1) 
@@ -706,11 +672,6 @@ namespace ta {
                         t.stop();
                         args.tuningTime += t.elapsedTime().nanos();
 
-                        //                         }
-                        
-
-
-
                         t.start();
                         activeBuckets = p.second; // this change is mainly for multithreading. It will force us to initialize more lists up-front --> less locking later
                         initListsInBuckets();
@@ -718,7 +679,6 @@ namespace ta {
                         t.stop();
                         args.dataManipulationTime += t.elapsedTime().nanos();
 
-                        //                         if (args.method != LEMP_LSH) {
                         t.start();
                         for (row_type b = 1; b < probeBuckets.size(); b++) {
                             retrArg[0].bucketInd = b;
@@ -726,19 +686,18 @@ namespace ta {
                             if (b < activeBuckets) {
                                 probeBuckets[b].ptrRetriever->tuneTopk(probeBuckets[b], retrArg);
 
-//                               std::cout<<b<<"-->"<<probeBuckets[b].t_b<<std::endl;
+//                                std::cout << b << "-->" << probeBuckets[b].t_b << " " << (int) probeBuckets[b].numLists << std::endl;
+
+
                             } else {
                                 probeBuckets[b].setAfterTuning(probeBuckets[b - 1].numLists, probeBuckets[b - 1].t_b);
                             }
-                            
+
 //                            probeBuckets[b].setAfterTuning(1, -1);
                         }
 
                         t.stop();
                         args.tuningTime += t.elapsedTime().nanos();
-                        //                         }
-
-
                     }
 
                     break;

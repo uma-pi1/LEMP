@@ -46,12 +46,9 @@ namespace ta {
             QueueElementLists* invLists = static_cast<QueueElementLists*> (probeBucket.getIndex(SL));
 
             col_type stepOnCol = 0;
-            row_type posMatrix, row;
-            bool stopFlag = false;
+            row_type posMatrix;
             double stopThreshold;
-            row_type prevRow;
-            double oldValue, newValue;
-            bool showFlag = false;
+            double oldValue;
             double localTheta;
 
             if (arg->forCosine) {
@@ -59,87 +56,76 @@ namespace ta {
             } else {
                 localTheta = arg->theta;
             }
-
-
+#ifdef TIME_IT
+            arg->t.start();
+#endif
             //initialize scheduler and state
             arg->state->initForNewQuery(query);
-            //stepOnCol = state.setQuery();
             stopThreshold = arg->state->initializeThreshold();
-
-
-
+#ifdef TIME_IT
+            arg->t.stop();
+            arg->preprocessTime += arg->t.elapsedTime().nanos();
+#endif
+            
             row_type countSeen = 0;
             //check if you need to stop. Otherwise continue;
-            while (!arg->state->allSeen) {
+            while (stopThreshold >= localTheta) {
 
                 //choose next step
-
                 stepOnCol = arg->state->chooseStep();
                 //pick up the item
-                //                row = arg->state->fringeDepth[stepOnCol];
-                //                oldValue = invLists->getValue(row, stepOnCol);
-                //                posMatrix = invLists->getRowPointer(row, stepOnCol);
                 oldValue = invLists->getElement(arg->state->fringePos[stepOnCol])->data;
                 posMatrix = invLists->getElement(arg->state->fringePos[stepOnCol])->id;
-
+//                scanned++;
+#ifdef TIME_IT
+                arg->t.start();
+#endif
                 //if I haven't explored the item already, do RA
                 if (!arg->state->exploredItems[posMatrix]) {
-
                     verifyCandidate(posMatrix + probeBucket.startPos, query, arg);
-                    // maintain the explored lists
                     countSeen++;
                     arg->state->maintainExploredLists(*(arg->probeMatrix), countSeen, stepOnCol);
                 }
+#ifdef TIME_IT
+                arg->t.stop();
+                arg->ipTime += arg->t.elapsedTime().nanos();
 
+                arg->t.start();
+#endif
                 // update the state
                 arg->state->updateState(stepOnCol);
-
-
-                //check if you need to stop. Otherwise continue;
-                if (!arg->state->allSeen) {
-                    stopFlag = arg->state->isThresholdUnterTheta(stopThreshold, localTheta, stepOnCol, oldValue, arg->forCosine);
-                }// otherwise you stop in  any case.
-
-
-                if (stopFlag || arg->state->allSeen) {
+#ifdef TIME_IT
+                arg->t.stop();
+                arg->scanTime += arg->t.elapsedTime().nanos();
+#endif
+                if (arg->state->allSeen){
                     break;
                 }
-
+                    
+#ifdef TIME_IT
+                arg->t.start();
+#endif
+                arg->state->isThresholdUnterTheta(stopThreshold, localTheta, stepOnCol, oldValue, arg->forCosine);
+#ifdef TIME_IT
+                arg->t.stop();
+                arg->boundsTime += arg->t.elapsedTime().nanos();
+#endif
             }
+            
+//            std::cout<<"stopThreshold: "<<stopThreshold<<" scanned: "<<scanned<<std::endl;
+
         }
 
         inline virtual void run(QueryBucket_withTuning& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) {
-#ifdef TIME_IT
-            //std::cout<<" TA-based retrieval running "<<std::endl;
-#endif
-            // this can go out of th loop. I run incr for all
-
-            QueueElementLists* invLists = static_cast<QueueElementLists*> (probeBucket.getIndex(SL));
-
-            arg->state->initializeForNewBucket(invLists);
-
-
-            for (row_type i = queryBatch.startPos; i < queryBatch.endPos; i++) {
-                const double* query = arg->queryMatrix->getMatrixRowPtr(i);
-
-                if (query[-1] < probeBucket.bucketScanThreshold)// skip all users from this point on for this bucket
-                    break;
-                arg->queryId = arg->queryMatrix->getId(i);
-                run(query, probeBucket, arg);
-            }
-
+            std::cerr << "Error! You shouldn't have called that" << std::endl;
+            exit(1);
         }
 
         inline void runTopK(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) {
 
             col_type stepOnCol = 0;
-            row_type posMatrix, row;
-            bool stopFlag = false;
-            double stopThreshold;
-            row_type prevRow;
-            double oldValue, newValue;
-            bool showFlag = false;
-            bool initializeThresholder = false;
+            row_type posMatrix;
+            double oldValue;
 
             QueueElementLists* invLists = static_cast<QueueElementLists*> (probeBucket.getIndex(SL));
 
@@ -151,120 +137,63 @@ namespace ta {
                 x1 = probeBucket.invNormL2.second;
                 x2 = probeBucket.invNormL2.first;
             }
-
-
-
-            //initialize scheduler and state
+            double localTheta = arg->heap.front().data * (arg->heap.front().data > 0 ? x1 : x2);
+#ifdef TIME_IT
+            arg->t.start();
+#endif
             arg->state->initForNewQuery(query);
-            //stepOnCol = state.setQuery();
-            //std::cout<<"done set query"<<std::endl;
-
+            double stopThreshold = arg->state->initializeThreshold();
+#ifdef TIME_IT
+            arg->t.stop();
+            arg->preprocessTime += arg->t.elapsedTime().nanos();
+#endif
 
             row_type countSeen = 0;
-            row_type i = 0;
-            //check if you need to stop. Otherwise continue;
-            while (!arg->state->allSeen) {
-
+            while (stopThreshold > localTheta) {
 
                 //choose next step
-
                 stepOnCol = arg->state->chooseStep();
                 //pick up the item
-                //                row = arg->state->fringeDepth[stepOnCol];
-                //                posMatrix = invLists->getRowPointer(row, stepOnCol);
-                //                oldValue = invLists->getValue(row, stepOnCol);
-
                 oldValue = invLists->getElement(arg->state->fringePos[stepOnCol])->data;
                 posMatrix = invLists->getElement(arg->state->fringePos[stepOnCol])->id;
-
-
+#ifdef TIME_IT
+                arg->t.start();
+#endif
                 //if I haven't explored the item already, do RA
                 if (!arg->state->exploredItems[posMatrix]) {
                     verifyCandidateTopk(posMatrix + probeBucket.startPos, query, arg);
-                    // maintain the explored lists
                     countSeen++;
                     arg->state->maintainExploredLists(*(arg->probeMatrix), countSeen, stepOnCol);
                 }
+#ifdef TIME_IT
+                arg->t.stop();
+                arg->ipTime += arg->t.elapsedTime().nanos();
 
-
-                if (!initializeThresholder) {
-                    stopThreshold = arg->state->initializeThreshold();
-                    initializeThresholder = true;
-                }
-
+                arg->t.start();
+#endif
                 // update the state
                 arg->state->updateState(stepOnCol);
-
-
-                /* Optimization for skipping threshold computation for top-k */
-                if (arg->heap.size() < arg->k)
-                    continue;
-
-
-                //check if you need to stop. Otherwise continue;
-                if (!arg->state->allSeen) {
-                    double localTheta = arg->heap.front().data * (arg->heap.front().data > 0 ? x1 : x2);
-                    stopFlag = arg->state->isThresholdUnterTheta(stopThreshold, localTheta, stepOnCol, oldValue, arg->forCosine);
-                }
-
-
-                if (stopFlag || arg->state->allSeen) {
+#ifdef TIME_IT
+                arg->t.stop();
+                arg->scanTime += arg->t.elapsedTime().nanos();
+#endif
+                if (arg->state->allSeen)
                     break;
-                }
-                i++;
+#ifdef TIME_IT
+                arg->t.start();
+#endif
+                localTheta = arg->heap.front().data * (arg->heap.front().data > 0 ? x1 : x2);
+                arg->state->isThresholdUnterTheta(stopThreshold, localTheta, stepOnCol, oldValue, arg->forCosine);
+#ifdef TIME_IT
+                arg->t.stop();
+                arg->boundsTime += arg->t.elapsedTime().nanos();
+#endif
             }
         }
 
         inline virtual void runTopK(QueryBucket_withTuning& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) {
-
-            QueueElementLists* invLists = static_cast<QueueElementLists*> (probeBucket.getIndex(SL));
-
-            if (!invLists->initialized) {
-#ifdef TIME_IT
-                arg->t.start();
-#endif
-                invLists->initializeLists(*(arg->probeMatrix), probeBucket.startPos, probeBucket.endPos);
-#ifdef TIME_IT
-                arg->t.stop();
-                arg->initializeListsTime += arg->t.elapsedTime().nanos();
-#endif
-            }
-
-            arg->state->initializeForNewBucket(invLists);
-
-            row_type user = queryBatch.startPos;
-            int start = queryBatch.startPos * arg->k;
-            int end = queryBatch.endPos * arg->k;
-            for (row_type i = start; i < end; i += arg->k) {
-                if (queryBatch.inactiveQueries[user - queryBatch.startPos]) {
-                    user++;
-                    continue;
-                }
-
-
-                const double* query = arg->queryMatrix->getMatrixRowPtr(user);
-
-                double minScore = arg->topkResults[i].data;
-
-                if (probeBucket.normL2.second < minScore) {// skip this bucket and all other buckets
-                    queryBatch.inactiveQueries[user - queryBatch.startPos] = true;
-                    queryBatch.inactiveCounter++;
-                    user++;
-                    continue;
-                }
-
-                arg->moveTopkToHeap(i);
-
-                arg->queryId = arg->queryMatrix->getId(user);
-                runTopK(query, probeBucket, arg);
-
-                arg->writeHeapToTopk(user);
-
-                user++;
-            }
-
-
-
+            std::cerr << "Error! You shouldn't have called that" << std::endl;
+            exit(1);
         }
 
         inline virtual void tune(ProbeBucket& probeBucket, std::vector<RetrievalArguments>& retrArg) {
@@ -274,7 +203,6 @@ namespace ta {
                 QueueElementLists* invLists = static_cast<QueueElementLists*> (probeBucket.getIndex(SL));
 
                 retrArg[0].state->initializeForNewBucket(invLists);
-
 
                 for (row_type i = 0; i < xValues->size(); i++) {
 
@@ -321,8 +249,6 @@ namespace ta {
                     retrArg[0].tunerTimer.stop();
                     sampleTimes[i] = retrArg[0].tunerTimer.elapsedTime().nanos();
                 }
-
-
             }
 
         }
@@ -402,10 +328,6 @@ namespace ta {
 
                 QueryBucket_withTuning& queryBatch = arg->queryBatches[q];
 
-#ifdef TIME_IT
-                //std::cout<<" TA-based retrieval running "<<std::endl;
-#endif
-     
                 for (row_type i = queryBatch.startPos; i < queryBatch.endPos; i++) {
                     const double* query = arg->queryMatrix->getMatrixRowPtr(i);
 

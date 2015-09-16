@@ -39,19 +39,19 @@ namespace ta {
     public:
 
         inline Naive(LEMPArg& args) : args(args) {
-            std::vector<std::vector<double> > leftMatrix, rightMatrix;
+            VectorMatrix leftMatrix, rightMatrix;
 
 
             if (args.querySideLeft) {
-                leftMatrix = ta::readMatrix(args.usersFile, true);
-                rightMatrix = ta::readMatrix(args.itemsFile, false);
+                leftMatrix.readFromFile(args.usersFile, true);
+                rightMatrix.readFromFile(args.itemsFile, false);
             } else {
-                leftMatrix = ta::readMatrix(args.itemsFile, false);
-                rightMatrix = ta::readMatrix(args.usersFile, true);
+                leftMatrix.readFromFile(args.itemsFile, false);
+                rightMatrix.readFromFile(args.usersFile, true);
             }
 
-            queryMatrix.init(leftMatrix);
-            probeMatrix.init(rightMatrix);
+            queryMatrix.init(leftMatrix, false, false);
+            probeMatrix.init(rightMatrix, false, false);
 
 
             //            queryMatrix.initForTopKPerUser(leftMatrix); // just to check
@@ -221,6 +221,8 @@ namespace ta {
 
            comp_type comparisons = 0;
            omp_set_num_threads(args.threads);
+           
+           std::cout<<"Start Top k retrieval"<<std::endl;
 
 #pragma omp parallel reduction(+ : comparisons)
            {

@@ -64,10 +64,10 @@ namespace ta {
                 std::cout << "Problem with opening log-file. No log-file will be created" << std::endl;
             }
             std::vector<row_type> blockOffsets;
-            
-            
-            std::cout<<"ALGO: TA_all"<<std::endl;
-            std::cout<<"Threads: "<<args.threads<<std::endl;
+
+
+            std::cout << "ALGO: TA_all" << std::endl;
+            std::cout << "Threads: " << args.threads << std::endl;
 
             retrArg = new RetrievalArguments(probeMatrix.colNum, queryMatrix, probeMatrix, LEMP_TA, false);
             retrArg->k = args.k;
@@ -107,7 +107,7 @@ namespace ta {
 
             logging << "TA_all";
 
-            logging << "\t \"" << args.usersFile << "\"" << "\t"<<args.threads<<"\t";
+            logging << "\t \"" << args.usersFile << "\"" << "\t" << args.threads << "\t";
 
 
         };
@@ -119,7 +119,7 @@ namespace ta {
             args.comparisons = 0;
 
 
-            
+
             std::cout << "Multiplication starts! theta: " << retrArg->theta << std::endl;
 
             t.start();
@@ -128,9 +128,11 @@ namespace ta {
 
             for (row_type i = 0; i < queryMatrix.rowNum; i++) {
                 const double* query = queryMatrix.getMatrixRowPtr(i);
-		retrArg->queryId = i;
+                retrArg->queryId = i;
                 probeBucket.ptrRetriever->run(query, probeBucket, retrArg);
             }
+
+
             thetaResults = &(retrArg->results);
             int totalSize = getResultSetSize();
             t.stop();
@@ -142,74 +144,86 @@ namespace ta {
             std::cout << "Total time: " << (dataManipulationTime / 1E9) + t.elapsedTime().seconds() << std::endl;
 
 
+            std::cout << "preprocessTime: " << retrArg->preprocessTime / 1E9 << std::endl;
+            std::cout << "ipTime: " << retrArg->ipTime / 1E9 << std::endl;
+            std::cout << "boundsTime: " << retrArg->boundsTime / 1E9 << std::endl;
+            std::cout << "scanTime: " << retrArg->scanTime / 1E9 << std::endl;
+            std::cout << "filterTime: " << retrArg->filterTime / 1E9 << std::endl;
+
 
             logging << "\t" << args.theta << "\t" << retrArg->comparisons << "\t" << getResultSetSize() << "\t";
             printTimes(t);
 
-	    if(args.resultsFile != ""){
-		std::vector< std::vector<MatItem >* > resultsForWriting;
-		resultsForWriting.push_back(thetaResults);
-		writeResults(resultsForWriting, args.resultsFile);
-	    }
+            if (args.resultsFile != "") {
+                std::vector< std::vector<MatItem >* > resultsForWriting;
+                resultsForWriting.push_back(thetaResults);
+                writeResults(resultsForWriting, args.resultsFile);
+            }
 
             logging.close();
         }
 
-        //        inline void runTopkPerUser() {
-        //            args.comparisons = 0;
-        //            bool forCosine = false;
-        //
-        //
-        //            std::cout << "Multiplication starts! k: " << retrArg->k << std::endl;
-        //            t.start();
-        //
-        //
-        //            QueueElementLists* invLists = static_cast<QueueElementLists*> (probeBucket.getIndex(SL));
-        //            retrArg->state->initializeForNewBucket(invLists);
-        //            
-        //            /////////////////////
-        //            
-        //            retrArg->topkResults.resize(queryMatrix.rowNum * args.k);
-        //            retrArg->heap.resize(args.k);
-        //            
-        //            for (row_type i = 0; i < queryMatrix.rowNum; i++) {
-        //                
-        //                double* query = queryMatrix.getMatrixRowPtr(i);
-        //                retrArg->queryId = i;              
-        //
-        //                for (row_type j = 0; j < args.k; j++) {
-        //                    double ip = queryMatrix.innerProduct(i, probeMatrix.getMatrixRowPtr(j));
-        //                    retrArg->comparisons++;
-        //                    retrArg->heap[j] = QueueElement(ip, j);
-        //                }
-        //
-        //                std::make_heap(retrArg->heap.begin(), retrArg->heap.end(), std::greater<QueueElement>()); //make the heap;
-        //                               
-        //              
-        //                probeBucket.ptrRetriever->runTopK(query,  probeBucket, retrArg);
-        //                
-        //                retrArg->writeHeapToTopk(i);               
-        //                
-        //            }  
-        //
-        //            topkResults = &(retrArg->topkResults);
-        //            t.stop();
-        //
-        //            std::cout << "Time for retrieval: " << t << std::endl;
-        //            std::cout << "Comparisons: " << retrArg->comparisons << std::endl;
-        //            std::cout << "Size of result: " << getResultSetSize() << std::endl;
-        //            std::cout << "Preprocessing time: " << dataManipulationTime / 1E9 << std::endl;
-        //            std::cout << "Total time: " << (dataManipulationTime / 1E9) + t.elapsedTime().seconds() << std::endl;
-        //
-        //
-        //            logging << "\t" << args.k << "\t" << retrArg->comparisons << "\t" << getResultSetSize() << "\t";
-        //            printTimes(t);
-        //
-        //
-        //            logging.close();
-        //        }
+        inline void runTopkPerUser() {
+            args.comparisons = 0;
+            bool forCosine = false;
 
-        inline void runTopkPerUser() { // parallel version
+
+            std::cout << "Multiplication starts! k: " << retrArg->k << std::endl;
+            t.start();
+
+
+            QueueElementLists* invLists = static_cast<QueueElementLists*> (probeBucket.getIndex(SL));
+            retrArg->state->initializeForNewBucket(invLists);
+
+            /////////////////////
+
+            retrArg->topkResults.resize(queryMatrix.rowNum * args.k);
+            retrArg->heap.resize(args.k);
+
+            for (row_type i = 0; i < queryMatrix.rowNum; i++) {
+
+                double* query = queryMatrix.getMatrixRowPtr(i);
+                retrArg->queryId = i;
+
+                for (row_type j = 0; j < args.k; j++) {
+                    double ip = queryMatrix.innerProduct(i, probeMatrix.getMatrixRowPtr(j));
+                    retrArg->comparisons++;
+                    retrArg->heap[j] = QueueElement(ip, j);
+                }
+
+                std::make_heap(retrArg->heap.begin(), retrArg->heap.end(), std::greater<QueueElement>()); //make the heap;
+
+
+                probeBucket.ptrRetriever->runTopK(query, probeBucket, retrArg);
+
+                retrArg->writeHeapToTopk(i);
+
+            }
+
+            topkResults = &(retrArg->topkResults);
+            t.stop();
+
+            std::cout << "Time for retrieval: " << t << std::endl;
+            std::cout << "Comparisons: " << retrArg->comparisons << std::endl;
+            std::cout << "Size of result: " << getResultSetSize() << std::endl;
+            std::cout << "Preprocessing time: " << dataManipulationTime / 1E9 << std::endl;
+            std::cout << "Total time: " << (dataManipulationTime / 1E9) + t.elapsedTime().seconds() << std::endl;
+
+            std::cout << "preprocessTime: " << retrArg->preprocessTime / 1E9 << std::endl;
+            std::cout << "ipTime: " << retrArg->ipTime / 1E9 << std::endl;
+            std::cout << "boundsTime: " << retrArg->boundsTime / 1E9 << std::endl;
+            std::cout << "scanTime: " << retrArg->scanTime / 1E9 << std::endl;
+            std::cout << "filterTime: " << retrArg->filterTime / 1E9 << std::endl;
+
+
+            logging << "\t" << args.k << "\t" << retrArg->comparisons << "\t" << getResultSetSize() << "\t";
+            printTimes(t);
+
+
+            logging.close();
+        }
+
+        inline void runTopkPerUser2() { // parallel version
             comp_type comparisons = 0;
 
 
@@ -223,41 +237,41 @@ namespace ta {
             /////////////////////
 
             retrArg->topkResults.resize(queryMatrix.rowNum * args.k);
-           
+
 #pragma omp parallel reduction(+ : comparisons)
             {
 
-                RetrievalArguments arg(probeMatrix.colNum, queryMatrix, probeMatrix, LEMP_TA, false);    
-                
+                RetrievalArguments arg(probeMatrix.colNum, queryMatrix, probeMatrix, LEMP_TA, false);
+
                 arg.k = args.k;
                 arg.heap.resize(args.k);
                 arg.init(0);
-                
+
                 arg.state->initializeForNewBucket(invLists);
-                
+
 
 #pragma omp for schedule(dynamic,10)
-            for (row_type i = 0; i < queryMatrix.rowNum; i++) {
+                for (row_type i = 0; i < queryMatrix.rowNum; i++) {
 
-                double* query = queryMatrix.getMatrixRowPtr(i);
-                arg.queryId = i;
+                    double* query = queryMatrix.getMatrixRowPtr(i);
+                    arg.queryId = i;
 
-                for (row_type j = 0; j < args.k; j++) {
-                    double ip = queryMatrix.innerProduct(i, probeMatrix.getMatrixRowPtr(j));
-                    arg.comparisons++;
-                    arg.heap[j] = QueueElement(ip, j);
+                    for (row_type j = 0; j < args.k; j++) {
+                        double ip = queryMatrix.innerProduct(i, probeMatrix.getMatrixRowPtr(j));
+                        arg.comparisons++;
+                        arg.heap[j] = QueueElement(ip, j);
+                    }
+
+                    std::make_heap(arg.heap.begin(), arg.heap.end(), std::greater<QueueElement>()); //make the heap;
+
+
+                    probeBucket.ptrRetriever->runTopK(query, probeBucket, &arg);
+
+                    row_type p = i * args.k;
+                    std::copy(arg.heap.begin(), arg.heap.end(), retrArg->topkResults.begin() + p);
+
                 }
-
-                std::make_heap(arg.heap.begin(), arg.heap.end(), std::greater<QueueElement>()); //make the heap;
-
-
-                probeBucket.ptrRetriever->runTopK(query, probeBucket, &arg);
-
-                row_type p = i * args.k;
-                std::copy(arg.heap.begin(), arg.heap.end(), retrArg->topkResults.begin() + p);
-
-            }
-                 comparisons += arg.comparisons;
+                comparisons += arg.comparisons;
 
             }
             topkResults = &(retrArg->topkResults);
@@ -272,14 +286,14 @@ namespace ta {
             logging << "\t" << args.k << "\t" << retrArg->comparisons << "\t" << getResultSetSize() << "\t";
             printTimes(t);
 
-	   if(args.resultsFile != ""){
-		std::vector<MatItem> results;
-		localToGlobalIds(*topkResults, args.k, results, queryMatrix);
-		std::vector< std::vector<MatItem >* > resultsForWriting;
-		resultsForWriting.push_back(&results);
-		writeResults(resultsForWriting, args.resultsFile);
-	   }
-	    
+            if (args.resultsFile != "") {
+                std::vector<MatItem> results;
+                localToGlobalIds(*topkResults, args.k, results, queryMatrix);
+                std::vector< std::vector<MatItem >* > resultsForWriting;
+                resultsForWriting.push_back(&results);
+                writeResults(resultsForWriting, args.resultsFile);
+            }
+
             logging.close();
         }
 

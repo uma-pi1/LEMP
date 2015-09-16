@@ -34,78 +34,41 @@ enum LEMP_Method{
 	LEMP_LC = 6,	
 	LEMP_C = 7,	
         LEMP_AP = 8,
-        LEMP_BLSH = 9,        
-        LEMP_NB = 10 // uses many and does naive bayes with costs
+        LEMP_TANRA = 9
+    
 };
 
-
-
-struct Arg{
-	double theta;
+struct LEMPArg{
+        double theta;
 	int k;
 	std::string usersFile;
 	std::string itemsFile;
 	bool querySideLeft;
-	
-        std::string clusterFile;
-
-	// logging
-	comp_type comparisons;
-	std::string logFile, resultsFile;
-
-	Arg(): k(0), querySideLeft(true){}
-
-};
-
-
-struct LEMPArg: public Arg{
+        std::string logFile, resultsFile;
+        comp_type comparisons;
+    
 	LEMP_Method method;
 	int cacheSizeinKB;
 	int threads;
         int depth;// for PCA Trees
-        int numClusters;
-        double epsilon; // for LSH
+        double epsilon, gamma; // for LSH
 	col_type listsForExplorationMode;
 	double dataManipulationTime, tuningTime;
 
 	double boundsTime, ipTime, scanTime, preprocessTime, filterTime, initializeListsTime, speedyTime;
-	double stepTime, queueTime, thresTime, updateStateTime, preTime; // todo change names and add to constructor
 
-	LEMPArg():Arg(), cacheSizeinKB (8192), method(LEMP_LI), boundsTime(0), ipTime(0), scanTime(0), preprocessTime(0), filterTime(0), speedyTime(0), initializeListsTime(0),
-			dataManipulationTime(0), tuningTime(0), stepTime(0), queueTime(0), thresTime(0), updateStateTime(0), preTime(0), threads(1),
-			listsForExplorationMode(1), depth(5), epsilon(0.03), numClusters(0){}
+
+	LEMPArg():k(0), querySideLeft(true), cacheSizeinKB (8192), method(LEMP_LI), boundsTime(0), ipTime(0), scanTime(0), preprocessTime(0), filterTime(0), speedyTime(0), initializeListsTime(0),
+			dataManipulationTime(0), tuningTime(0), threads(1), listsForExplorationMode(1), depth(5), epsilon(0.0), gamma(0){}
 
 	void printTimes(){
-		
-
 		std::cout<< "Preprocessing Time: "<<dataManipulationTime/1E9 <<std::endl;
 		std::cout<< "Tuning Time: "<<tuningTime/1E9 <<std::endl;
-		
-#ifdef TIME_IT
-		std::cout<< "-------------"<<std::endl;
-		if (method != LEMP_TA){
-
-			//LOG4CXX_INFO(logger, "initializeListsTime: "<<initializeListsTime/1E9 );
-		}else{
-			std::cout<<"preTime: "<<preTime/1E9 <<std::endl;
-			std::cout<< "stepTime: "<<stepTime/1E9<<std::endl;
-			std::cout<< "queueTime: "<<queueTime/1E9<<std::endl;
-			std::cout<< "thresTime: "<<thresTime/1E9 <<std::endl;
-			std::cout<< "updateStateTime: "<<updateStateTime/1E9 <<std::endl;
-			std::cout<< "ipTime: "<<ipTime/1E9 <<std::endl;
-		}
-		std::cout<< "-------------" <<std::endl;
-#endif
 	}
 
 
 };
 
-struct TreeArg: public Arg{
-	int N0;
-	TreeArg(): Arg(), N0(2){}
-
-};
 
 
 

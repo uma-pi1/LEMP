@@ -41,28 +41,6 @@ namespace ta {
         file >> std::skipws;
     }
 
-
-    // assumes that 0 column of the matrix is spared for storing the length
-
-    void normalizeMatrix(std::vector<std::vector<double> > & matrix) {
-        assert(matrix.size() > 0);
-        ta_size_type colnum = matrix[0].size();
-        ta_size_type rownum = matrix.size();
-
-        std::cout << "normalizing... " << std::endl;
-        for (ta_size_type j = 0; j < rownum; j++) {
-            double length = 0.0;
-            for (ta_size_type i = 1; i < colnum; i++) {
-                length += matrix[j][i] * matrix[j][i];
-            }
-            length = sqrt(length);
-            matrix[j][0] = length; //store the length on the 0-column
-            for (ta_size_type i = 1; i < colnum; i++) {
-                matrix[j][i] /= length;
-            }
-        }
-    }
-
     std::vector<std::vector<double> > readMatrix(std::string& fileName, bool left) {
 
         std::vector<std::vector<double> > matrix;
@@ -94,72 +72,8 @@ namespace ta {
             }
         }
         file.close();
-        //	std::cout << "Done reading matrix " << fileName << std::endl;
-
-
-
         return matrix;
     }
-
-//    std::vector< std::vector<row_type> > readClusters(std::string& fileName, int numOfClusters, row_type numOfItems) {
-//        std::ifstream file(fileName.c_str(), std::ios_base::in);
-//
-//        std::vector<std::vector<row_type> > clusters;
-//        clusters.resize(numOfClusters);
-//
-//
-//        int c;
-//
-//        if (file) {
-//
-//            for (int i = 0; i < numOfItems; i++) {
-//                file >> c;
-//                clusters[c].push_back(i);
-//            }
-//
-//
-//
-//        }
-//        file.close();
-//
-//        return clusters;
-//    }
-    
-        void readClusters(std::string& fileName, std::vector<int> & clusterIds, row_type numOfItems) {
-        std::ifstream file(fileName.c_str(), std::ios_base::in);
-        
-        clusterIds.reserve(numOfItems);
-
-        int c;
-        
-         std::cout << "Reading clustering file: " << fileName << std::endl;
-
-        if (file) {
-
-            for (int i = 0; i < numOfItems; i++) {
-                file >> c;
-                clusterIds.push_back(c);
-            }
-        }
-        file.close();
-
-    }
-    
-    
-    //void writeResults(std::string& fileName, std::vector<MatItem>& results){
-    //	std::sort (results.begin(), results.end(), std::greater<MatItem>());
-    //
-    //	// open file
-    //	std::ofstream out(fileName.c_str());
-    //	if (!out.is_open())
-    //		RG_THROW(rg::IOException, std::string("Cannot open file ") + fileName);
-    //
-    //	for (long i=0; i<results.size(); i++){
-    //		out<<results[i].result<<"\t"<<results[i].i<<"\t"<<results[i].j<<std::endl;
-    //	}
-    //	// done
-    //	out.close();
-    //}
 
     inline void writeResults(std::vector< std::vector<MatItem >* >& globalResults, std::string& file) {
 
@@ -181,90 +95,6 @@ namespace ta {
         }
         out.close();
     }
-    
-    
-
-    void readAndCompareResults(std::string& fileName1, std::string& fileName2) {
-        std::ifstream file1(fileName1.c_str(), std::ios_base::in);
-        std::ifstream file2(fileName2.c_str(), std::ios_base::in);
-
-        std::string line1, line2;
-        std::vector<std::string> res1, res2;
-
-        if (!file1.is_open())
-            std::cout<<"file "<<fileName1<<" not open"<<std::endl;
-        if (!file2.is_open())
-            std::cout<<"file "<<fileName2<<" not open"<<std::endl;
-        
-
-        while (std::getline(file1, line1) && std::getline(file2, line2)) {
-
-            res1.push_back(line1);
-            res2.push_back(line2);
-        }
-
-        file1.close();
-        file2.close();
-
-        std::cout << "res1 size: " << res1.size() << std::endl;
-        std::cout << "res2 size: " << res2.size() << std::endl;
-
-        row_type nonSame = 0;
-        if (res1.size() != res2.size()) {
-            std::cout << "of non equal size" << std::endl;
-            exit(1);
-        }
-
-
-        for (int i = 0; i < res1.size(); i++) {
-            bool thisOk = false;
-
-            for (int j = 0; j < res2.size(); j++) {
-                if (res1[i] == res2[j]) {
-                    thisOk = true;
-                    break;
-                }
-            }
-            if (!thisOk) {
-                nonSame++;
-            }
-        }
-
-        std::cout << "nonSame: " << nonSame << " out of " << res1.size() << std::endl;
-
-    }
-
-    bool compareResults(std::string& fileName1, std::string& fileName2) {
-        std::ifstream file1(fileName1.c_str(), std::ios_base::in);
-        std::ifstream file2(fileName2.c_str(), std::ios_base::in);
-
-        std::string line1, line2;
-        ta_size_type i = 0;
-        while (std::getline(file1, line1) && std::getline(file2, line2)) {
-            i++;
-            if (line1 != line2) {
-                file1.close();
-                file2.close();
-                std::cout << "The results are NOT EQUAL" << std::endl;
-                std::cout << "First inconsistency in line " << i << std::endl;
-                return false;
-            }
-
-        }
-
-        file1.close();
-        file2.close();
-        std::cout << "The results are EQUAL" << std::endl;
-        return true;
-    }
-
-
-
-
-
-
-
-
 }
 
 
