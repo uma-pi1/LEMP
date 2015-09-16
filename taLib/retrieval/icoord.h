@@ -13,14 +13,14 @@
 //    limitations under the License.
 
 /* 
- * File:   incr2.h
+ * File:   icoord.h
  * Author: chteflio
  *
  * Created on December 14, 2014, 11:59 AM
  */
 
-#ifndef INCR2_H
-#define	INCR2_H
+#ifndef ICOORD_H
+#define	ICOORD_H
 
 #include "ListsTuneData.h"
 
@@ -75,7 +75,7 @@ namespace ta {
                     row_type length = arg->intervals[0].end - arg->intervals[0].start;
 
                     for (row_type i = 0; i < length; i++) {
-                        arg->ext_cp_array[entry[i].id].addFirst(qi, entry[i].data);
+                        arg->ext_cp_array[entry[i].id].addFirst(qi, entry[i].data); ///////////////////
                     }
 
                     // add Candidates
@@ -91,7 +91,7 @@ namespace ta {
                         length = arg->intervals[j].end - arg->intervals[j].start;
 
                         for (row_type i = 0; i < length; i++) {
-                            arg->ext_cp_array[entry[i].id].add(qi, entry[i].data);
+                            arg->ext_cp_array[entry[i].id].add(qi, entry[i].data); ////////////////////////
                         }
 
                     }
@@ -110,14 +110,14 @@ namespace ta {
                     for (row_type i = 0; i < length; i++) {
                         row_type row = entry[i].id;
                         double len = query[-1] * arg->probeMatrix->lengthInfo[row + probeBucket.startPos].data; //.getVectorLength(row+probeBucket.startPos);
-                        
-                        if (!arg->ext_cp_array[row].prune(len, arg->theta, seenQi2) ) {
+
+                        if (!arg->ext_cp_array[row].prune(len, arg->theta, seenQi2)) {
                             arg->candidatesToVerify[numCandidatesToVerify] = row + probeBucket.startPos;
                             numCandidatesToVerify++;
                         }
-                        
-                        
-                        
+
+
+
                     }
 
 #ifdef TIME_IT
@@ -173,9 +173,18 @@ namespace ta {
 
         inline void runTopK(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) {
 
+            double localTheta = arg->heap.front().data;
 
 
-            double localTheta = arg->heap.front().data * (arg->heap.front().data > 0 ? probeBucket.invNormL2.second : probeBucket.invNormL2.first);
+#ifdef RELATIVE_APPROX
+            localTheta *= arg->currGammaAppr;
+#else 
+#ifdef         ABS_APPROX             
+            localTheta += arg->currGammaAppr;
+#endif
+#endif
+
+            localTheta *= (localTheta > 0 ? probeBucket.invNormL2.second : probeBucket.invNormL2.first);
 
             double qi;
             row_type numCandidatesToVerify = 0;
@@ -223,12 +232,16 @@ namespace ta {
                     //initialize
 
                     qi = query[arg->intervals[0].col];
+
+
+
                     seenQi2 -= qi * qi;
 
                     QueueElement* entry = invLists->getElement(arg->intervals[0].start);
                     row_type length = arg->intervals[0].end - arg->intervals[0].start;
 
                     for (row_type i = 0; i < length; i++) {
+
                         arg->ext_cp_array[entry[i].id].addFirst(qi, entry[i].data);
                     }
 
@@ -240,6 +253,7 @@ namespace ta {
 
                         if (qi == 0)
                             continue;
+
 
                         seenQi2 -= qi * qi;
 
@@ -265,11 +279,20 @@ namespace ta {
                         row_type row = entry[i].id;
                         double len = arg->probeMatrix->lengthInfo[row + probeBucket.startPos].data; //.getVectorLength(row+probeBucket.startPos);
 
-                        if (!arg->ext_cp_array[row].prune(len, arg->heap.front().data, seenQi2)) {
+                        double privTheta = arg->heap.front().data;
+#ifdef RELATIVE_APPROX
+                        privTheta *= arg->currGammaAppr;
+#else 
+#ifdef         ABS_APPROX             
+                        privTheta += arg->currGammaAppr;
+#endif
+#endif
+
+                        if (!arg->ext_cp_array[row].prune(len, privTheta, seenQi2)) {
                             arg->candidatesToVerify[numCandidatesToVerify] = row + probeBucket.startPos;
                             numCandidatesToVerify++;
                         }
-                        
+
                     }
 
 #ifdef TIME_IT
@@ -382,8 +405,23 @@ namespace ta {
                 const double* query = arg->queryMatrix->getMatrixRowPtr(user);
 
                 double minScore = arg->topkResults[i].data;
+                double minScoreAppr = minScore;
+#ifdef RELATIVE_APPROX
+                if (minScoreAppr >= 0) {
+                    minScoreAppr *= (1 + arg->gamma);
+                    arg->currGammaAppr = (1 + arg->gamma);
+                } else {
+                    minScoreAppr *= (1 - arg->gamma);
+                    arg->currGammaAppr = (1 - arg->gamma);
+                }
+#else 
+#ifdef         ABS_APPROX             
+                minScoreAppr += arg->queryMatrix->gammaEquivalents[user];
+                arg->currGammaAppr = arg->queryMatrix->gammaEquivalents[user];
+#endif
+#endif
 
-                if (probeBucket.normL2.second < minScore) {// skip this bucket and all other buckets
+                if (probeBucket.normL2.second < minScoreAppr) {// skip this bucket and all other buckets
                     queryBatch.inactiveQueries[user - queryBatch.startPos] = true;
                     queryBatch.inactiveCounter++;
                     user++;
@@ -465,8 +503,24 @@ namespace ta {
                     const double* query = arg->queryMatrix->getMatrixRowPtr(user);
 
                     double minScore = arg->topkResults[i].data;
+                    double minScoreAppr = minScore;
 
-                    if (probeBucket.normL2.second < minScore) {// skip this bucket and all other buckets
+#ifdef RELATIVE_APPROX
+                    if (minScoreAppr >= 0) {
+                        minScoreAppr *= (1 + arg->gamma);
+                        arg->currGammaAppr = (1 + arg->gamma);
+                    } else {
+                        minScoreAppr *= (1 - arg->gamma);
+                        arg->currGammaAppr = (1 - arg->gamma);
+                    }
+#else 
+#ifdef         ABS_APPROX             
+                    minScoreAppr += arg->queryMatrix->gammaEquivalents[user];
+                    arg->currGammaAppr = arg->queryMatrix->gammaEquivalents[user];
+#endif
+#endif
+
+                    if (probeBucket.normL2.second < minScoreAppr) {// skip this bucket and all other buckets
                         queryBatch.inactiveQueries[user - queryBatch.startPos] = true;
                         queryBatch.inactiveCounter++;
                         user++;
@@ -550,5 +604,5 @@ namespace ta {
     };
 }
 
-#endif	/* INCR2_H */
+#endif	/* ICOORD_H */
 
