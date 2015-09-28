@@ -147,13 +147,6 @@ namespace ta {
             if (stopThreshold < localTheta) {
                 return true;
             }
-
-            if (forCosine) {
-                if (stopThreshold > 1 && 1 < localTheta) {
-                    return true;
-                }
-            }
-
             return false;
         }
 
