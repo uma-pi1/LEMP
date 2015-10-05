@@ -56,11 +56,11 @@ namespace ta {
         inline virtual void populateBinsSingle(uint8_t* sketch, row_type startBlock, row_type endBlock, std::vector<row_type>& countsOfBlockValues, row_type probeId) {
         }
 
-        inline virtual void getCandidates(uint8_t* querySketches, row_type queryPos, std::vector<row_type>& candidatesToVerify, row_type& numCandidatesToVerify,
+        inline virtual void getCandidates(uint8_t* querySketches, row_type queryPos, row_type* candidatesToVerify, row_type& numCandidatesToVerify,
                 boost::dynamic_bitset<>& done, row_type activeBlocks, row_type probeBucketStartPos) {
         }
 
-        inline virtual void getCandidatesOfSingleBin(uint8_t* querySketches, row_type queryPos, std::vector<row_type>& candidatesToVerify, row_type& numCandidatesToVerify,
+        inline virtual void getCandidatesOfSingleBin(uint8_t* querySketches, row_type queryPos, row_type* candidatesToVerify, row_type& numCandidatesToVerify,
                 boost::dynamic_bitset<>& done, row_type binNum, row_type probeBucketStartPos, long long t) {
         }
 
@@ -235,7 +235,7 @@ namespace ta {
 //             }
         }
 
-        inline void getCandidates(uint8_t* querySketches, row_type queryPos, std::vector<row_type>& candidatesToVerify, row_type& numCandidatesToVerify,
+        inline void getCandidates(uint8_t* querySketches, row_type queryPos, row_type* candidatesToVerify, row_type& numCandidatesToVerify,
                 boost::dynamic_bitset<>& done, row_type activeBlocks, row_type probeBucketStartPos) {
 
             done.reset();
@@ -271,7 +271,7 @@ namespace ta {
             }
         }
 
-        inline void getCandidatesOfSingleBin(uint8_t* querySketches, row_type queryPos, std::vector<row_type>& candidatesToVerify, row_type& numCandidatesToVerify,
+        inline void getCandidatesOfSingleBin(uint8_t* querySketches, row_type queryPos, row_type* candidatesToVerify, row_type& numCandidatesToVerify,
                 boost::dynamic_bitset<>& done, row_type binNum, row_type probeBucketStartPos, long long t) {
 
             //             long long t = queryPos * userOffset + binNum;
@@ -355,7 +355,7 @@ namespace ta {
             bins.resize(size);
         }
 
-        inline void getCandidates(uint8_t* querySketches, row_type queryPos, std::vector<row_type>& candidatesToVerify, row_type& numCandidatesToVerify,
+        inline void getCandidates(uint8_t* querySketches, row_type queryPos, row_type* candidatesToVerify, row_type& numCandidatesToVerify,
                 boost::dynamic_bitset<>& done, row_type activeBlocks, row_type probeBucketStartPos) {
 
             done.reset();
@@ -386,7 +386,7 @@ namespace ta {
             }
         }
 
-        inline void getCandidatesOfSingleBin(uint8_t* querySketches, row_type queryPos, std::vector<row_type>& candidatesToVerify, row_type& numCandidatesToVerify,
+        inline void getCandidatesOfSingleBin(uint8_t* querySketches, row_type queryPos, row_type* candidatesToVerify, row_type& numCandidatesToVerify,
                 boost::dynamic_bitset<>& done, row_type binNum, row_type probeBucketStartPos, long long t) {
 
 
@@ -477,7 +477,7 @@ namespace ta {
             }
         }
 
-        inline void getCandidates(uint8_t* querySketches, row_type queryPos, std::vector<row_type>& candidatesToVerify, row_type& numCandidatesToVerify,
+        inline void getCandidates(uint8_t* querySketches, row_type queryPos, row_type* candidatesToVerify, row_type& numCandidatesToVerify,
                 boost::dynamic_bitset<>& done, row_type activeBlocks, row_type probeBucketStartPos) {
 
             done.reset();
@@ -511,7 +511,7 @@ namespace ta {
             }
         }
 
-        inline void getCandidatesOfSingleBin(uint8_t* querySketches, row_type queryPos, std::vector<row_type>& candidatesToVerify, row_type& numCandidatesToVerify,
+        inline void getCandidatesOfSingleBin(uint8_t* querySketches, row_type queryPos, row_type* candidatesToVerify, row_type& numCandidatesToVerify,
                 boost::dynamic_bitset<>& done, row_type binNum, row_type probeBucketStartPos, long long t) {
 
             //             long long t = queryPos * userOffset + bytesPerCode*binNum;
@@ -597,7 +597,7 @@ namespace ta {
             }
         }
 
-        inline void getCandidates(uint8_t* querySketches, row_type queryPos, std::vector<row_type>& candidatesToVerify, row_type& numCandidatesToVerify,
+        inline void getCandidates(uint8_t* querySketches, row_type queryPos, row_type* candidatesToVerify, row_type& numCandidatesToVerify,
                 boost::dynamic_bitset<>& done, row_type activeBlocks, row_type probeBucketStartPos) {
 
             done.reset();
@@ -631,7 +631,7 @@ namespace ta {
             }
         }
 
-        inline void getCandidatesOfSingleBin(uint8_t* querySketches, row_type queryPos, std::vector<row_type>& candidatesToVerify, row_type& numCandidatesToVerify,
+        inline void getCandidatesOfSingleBin(uint8_t* querySketches, row_type queryPos, row_type* candidatesToVerify, row_type& numCandidatesToVerify,
                 boost::dynamic_bitset<>& done, row_type binNum, row_type probeBucketStartPos, long long t) {
 
             //             long long t = queryPos * userOffset + bytesPerCode*binNum;

@@ -164,9 +164,7 @@ namespace ta {
             retrArg->state->initializeForNewBucket(invLists);
 
             /////////////////////
-
-            retrArg->topkResults.resize(queryMatrix.rowNum * args.k);
-            retrArg->heap.resize(args.k);
+            retrArg->allocTopkResults();
 
             for (row_type i = 0; i < queryMatrix.rowNum; i++) {
 

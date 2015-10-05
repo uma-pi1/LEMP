@@ -27,19 +27,15 @@
 
 namespace ta {
 
-    class TAState {
+    class TAState {        
+        
     public:
-
-
         const double* query;
         QueueElementLists* invLists;
-
-        std::vector<bool> exploredItems;
+        boost::dynamic_bitset<> exploredItems; 
         col_type colNum;
         row_type rowNum;
-
         std::vector<long> fringePos;
-
         bool allSeen; // true if you should stop scanning
 
 
@@ -51,7 +47,7 @@ namespace ta {
 
         inline virtual void initForNewQuery(const double* q) {
             query = q;
-            std::fill(exploredItems.begin(), exploredItems.end(), false);
+            exploredItems.reset();
             allSeen = false;
         }
 
@@ -131,7 +127,6 @@ namespace ta {
                 exploredItems[rowId] = true;
             }
         }
-
     };
 
     class TAStateMAX : public TAState {
@@ -148,7 +143,6 @@ namespace ta {
         inline void initForNewQuery(const double* q) {// initialize to specific rows
             TAState::initForNewQuery(q);
             piqi.clear();
-
 
             for (col_type i = 0; i < colNum; i++) {
                 if (query[i] < 0) { //scan downwards///////////////////////

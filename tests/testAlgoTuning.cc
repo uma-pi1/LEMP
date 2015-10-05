@@ -38,12 +38,13 @@ int main() {
 
     LEMPArg args;
 //     args.theta = 0.035;
-       args.k = 10;
-//        args.querySideLeft = false;
-    args.method = LEMP_LI;
+       args.k = 50;
+        args.querySideLeft = false;
+    args.method = LEMP_LSH;
     args.cacheSizeinKB = 2048;
     args.threads = 1;
-    args.epsilon = 0.3;
+    args.R = 0.5;
+    args.isTARR = true;
 
 
     args.usersFile = "/home/chteflio/data/ta-data/w-50-gnmf-zero.mma";

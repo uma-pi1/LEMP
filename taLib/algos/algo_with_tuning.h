@@ -255,10 +255,8 @@ namespace ta {
             initializeRetrievers();
             for (int i = 0; i < retrArg.size(); i++) {
                 retrArg[i].init(maxProbeBucketSize);
-                if (args.k > 0) {
-                    retrArg[i].heap.resize(args.k);
-                    retrArg[i].topkResults.resize(retrArg[i].queryMatrix->rowNum * args.k);
-
+                if (args.k > 0) {                    
+                    retrArg[i].allocTopkResults();
                 }
             }
             t.stop();
@@ -524,12 +522,9 @@ namespace ta {
         }
     }
 
-    inline void Algo_withTuning::initQueryBatches(VectorMatrix& leftMatrix, row_type maxBlockSize) {
-        std::vector<row_type> blockOffsets;
+    inline void Algo_withTuning::initQueryBatches(VectorMatrix& leftMatrix, row_type maxBlockSize) {      
         row_type nCount = 0;
-
-
-
+        
         if (args.k > 0) { // this is a top-k version
             initializeMatrices(leftMatrix, queryMatrices, false, true, args.epsilon); // normalize but don't sort
         } else {

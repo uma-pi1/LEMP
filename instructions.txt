@@ -75,6 +75,7 @@ Options:
                                  Relative Approximation
   --querySideLeft arg (=1)       1 if Q^T contains the queries (default).
                                  Interesting for Row-Top-k
+  --isTARR arg (=1)              for LEMP-TA. If 1 Round Robin schedule is used (default). Otherwise Max PiQi
   --method arg                   LEMP_X where X: L, LI, LC, I, C, TA, TREE, AP,LSH
   --k arg (=0)                   top k (default 0). If 0 Above-theta will run
   --logFile arg                  output File (contains runtime information)
@@ -177,6 +178,7 @@ Options:
   --k arg (=0)             top k (default 0). If 0 Above-theta will run
   --querySideLeft arg (=1) 1 if Q^T contains the queries (default). Interesting
                            for Row-Top-k
+  --isTARR arg (=1)        If 1 Round Robin schedule is used(default). Otherwise Max PiQi
   --logFile arg            output File (contains runtime information)
   --resultsFile arg        output File (contains the results)
 

@@ -86,7 +86,7 @@ namespace ta {
 
   
 
-        inline void getCandidates(std::vector<row_type>& candidatesToVerify, row_type& numCandidatesToVerify, double localTheta, double stopThreshold) {
+        inline void getCandidates(row_type* candidatesToVerify, row_type& numCandidatesToVerify, double localTheta, double stopThreshold) {
             unordered_map<row_type, std::pair<double, std::vector<col_type> >  >::iterator it;
 
             for (it = worstScores.begin(); it != worstScores.end(); it++) {
