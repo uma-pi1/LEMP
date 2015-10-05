@@ -38,6 +38,7 @@ int main(int argc, char *argv[]) {
 
 
     bool querySideLeft = true;
+    bool isTARR = true;
     int k, cacheSizeinKB, threads;
     std::string methodStr;
     LEMP_Method method;
@@ -52,6 +53,7 @@ int main(int argc, char *argv[]) {
             ("R", value<double>(&R)->default_value(0.97), "recall parameter for LSH")
 	    ("epsilon", value<double>(&epsilon)->default_value(0.0), "epsilon value for LEMP-LI with Absolute or Relative Approximation")
             ("querySideLeft", value<bool>(&querySideLeft)->default_value(true), "1 if Q^T contains the queries (default). Interesting for Row-Top-k")
+            ("isTARR", value<bool>(&isTARR)->default_value(true), "for LEMP-TA. If 1 Round Robin schedule is used (default). Otherwise Max PiQi")
             ("method", value<string>(&methodStr), "LEMP_X where X: L, LI, LC, I, C, TA, TREE, AP, BLSH")
             ("k", value<int>(&k)->default_value(0), "top k (default 0). If 0 Above-theta will run")
             ("logFile", value<string>(&logFile)->default_value(""), "output File (contains runtime information)")
@@ -90,6 +92,7 @@ int main(int argc, char *argv[]) {
     args.threads = threads;
     args.R = R;
     args.epsilon = epsilon;
+    args.isTARR = isTARR;
     
    
 

@@ -80,29 +80,29 @@ namespace ta {
 
         col_type colnum, maxLists, numLists;
         bool forCosine; // to be used for TA
-        
+        bool isTARR; // true: TAStateRR  false: TAStateMAX
         
 
         RetrievalArguments(col_type colnum, VectorMatrix& queryMatrix, VectorMatrix& probeMatrix, LEMP_Method method,
-                bool forCosine = true) :
+                bool forCosine = true, bool isTARR = false) :
         colnum(colnum), comparisons(0), probeMatrix(&probeMatrix), queryMatrix(&queryMatrix), forCosine(forCosine), method(method),
         boundsTime(0), ipTime(0), scanTime(0), preprocessTime(0), filterTime(0), initializeListsTime(0), lengthTime(0), state(0),tanraState(0),
         prevBucketBestPhi(-1), threads(1), worstMinScore(std::numeric_limits<double>::max()), 
-        competitorMethod(0), onlyRunTime(0), sketches(0), rig(NULL) {
+        competitorMethod(0), onlyRunTime(0), sketches(0), rig(NULL), isTARR(isTARR) {
             random = rg::Random32(123); // PSEUDO-RANDOM
 
         }
 
         inline RetrievalArguments() : comparisons(0), forCosine(true), boundsTime(0), ipTime(0), scanTime(0),
         preprocessTime(0), filterTime(0), initializeListsTime(0), lengthTime(0), state(0),tanraState(0),
-        prevBucketBestPhi(-1), threads(1), colnum(0), queryMatrix(0), probeMatrix(0), competitorMethod(0), onlyRunTime(0), sketches(0), rig(NULL) {
+        prevBucketBestPhi(-1), threads(1), colnum(0), queryMatrix(0), probeMatrix(0), competitorMethod(0), onlyRunTime(0), sketches(0), rig(NULL), isTARR(false) {
             random = rg::Random32(123);
         }
 
         inline void initializeBasics(
                 VectorMatrix& queryMatrix1, VectorMatrix& probeMatrix1,
                 LEMP_Method method1, double theta1, int k1,
-                int threads1, double R1, double epsilon1,  bool forCosine1 = true) {
+                int threads1, double R1, double epsilon1,  bool forCosine1 = true, bool isTARR1 = false) {
 
             queryMatrix = &queryMatrix1;
             probeMatrix = &probeMatrix1;
@@ -115,7 +115,8 @@ namespace ta {
             k = k1;
             threads = threads1;
             R = R1;
-            epsilon = epsilon1;     
+            epsilon = epsilon1;    
+            isTARR = isTARR1;
 	    
 #ifdef RELATIVE_APPROX
 	    epsilon = epsilon/(1-epsilon);
@@ -135,10 +136,8 @@ namespace ta {
             if (method == LEMP_LSH) {
                 if (sketches)
                     delete[] sketches;
-
                 if (rig)
                     delete rig;
-
             }
         }
 
@@ -229,7 +228,11 @@ namespace ta {
             }
 
             if (method == LEMP_TA) {
-                state = new TAState(colnum);
+                if(isTARR){
+                    state = new TAStateRR(colnum);
+                }else{
+                    state = new TAStateMAX(colnum);
+                }                
             }
             
             if (method == LEMP_TANRA) {

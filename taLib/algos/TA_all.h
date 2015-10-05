@@ -57,22 +57,21 @@ namespace ta {
             logging.open(args.logFile.c_str(), std::ios_base::app);
 
             if (logging.is_open()) {
-
                 std::cout << "Writing output to " << args.logFile << std::endl;
             } else {
-
                 std::cout << "Problem with opening log-file. No log-file will be created" << std::endl;
             }
-            std::vector<row_type> blockOffsets;
-
-
-            std::cout << "ALGO: TA_all" << std::endl;
+            if (args.isTARR){
+                std::cout << "ALGO: TA_all with RR" << std::endl;
+            }else{
+                std::cout << "ALGO: TA_all with MaxPiQi" << std::endl;
+            }
+            
             std::cout << "Threads: " << args.threads << std::endl;
 
-            retrArg = new RetrievalArguments(probeMatrix.colNum, queryMatrix, probeMatrix, LEMP_TA, false);
+            retrArg = new RetrievalArguments(probeMatrix.colNum, queryMatrix, probeMatrix, LEMP_TA, false, args.isTARR);
             retrArg->k = args.k;
             retrArg->theta = args.theta;
-            //retrArg->forCosine = false;
 
             retrArg->init(0);
 
@@ -117,9 +116,6 @@ namespace ta {
 
         inline void multiply() {
             args.comparisons = 0;
-
-
-
             std::cout << "Multiplication starts! theta: " << retrArg->theta << std::endl;
 
             t.start();
@@ -131,10 +127,7 @@ namespace ta {
                 retrArg->queryId = i;
                 probeBucket.ptrRetriever->run(query, probeBucket, retrArg);
             }
-
-
-            thetaResults = &(retrArg->results);
-            int totalSize = getResultSetSize();
+            thetaResults = &(retrArg->results);            
             t.stop();
 
             std::cout << "Time for retrieval: " << t << std::endl;
@@ -144,11 +137,11 @@ namespace ta {
             std::cout << "Total time: " << (dataManipulationTime / 1E9) + t.elapsedTime().seconds() << std::endl;
 
 
-            std::cout << "preprocessTime: " << retrArg->preprocessTime / 1E9 << std::endl;
-            std::cout << "ipTime: " << retrArg->ipTime / 1E9 << std::endl;
-            std::cout << "boundsTime: " << retrArg->boundsTime / 1E9 << std::endl;
-            std::cout << "scanTime: " << retrArg->scanTime / 1E9 << std::endl;
-            std::cout << "filterTime: " << retrArg->filterTime / 1E9 << std::endl;
+//            std::cout << "preprocessTime: " << retrArg->preprocessTime / 1E9 << std::endl;
+//            std::cout << "ipTime: " << retrArg->ipTime / 1E9 << std::endl;
+//            std::cout << "boundsTime: " << retrArg->boundsTime / 1E9 << std::endl;
+//            std::cout << "scanTime: " << retrArg->scanTime / 1E9 << std::endl;
+//            std::cout << "filterTime: " << retrArg->filterTime / 1E9 << std::endl;
 
 
             logging << "\t" << args.theta << "\t" << retrArg->comparisons << "\t" << getResultSetSize() << "\t";
@@ -165,13 +158,8 @@ namespace ta {
 
         inline void runTopkPerUser() {
             args.comparisons = 0;
-            bool forCosine = false;
-
-
             std::cout << "Multiplication starts! k: " << retrArg->k << std::endl;
             t.start();
-
-
             QueueElementLists* invLists = static_cast<QueueElementLists*> (probeBucket.getIndex(SL));
             retrArg->state->initializeForNewBucket(invLists);
 
@@ -192,10 +180,7 @@ namespace ta {
                 }
 
                 std::make_heap(retrArg->heap.begin(), retrArg->heap.end(), std::greater<QueueElement>()); //make the heap;
-
-
                 probeBucket.ptrRetriever->runTopK(query, probeBucket, retrArg);
-
                 retrArg->writeHeapToTopk(i);
 
             }
@@ -209,17 +194,15 @@ namespace ta {
             std::cout << "Preprocessing time: " << dataManipulationTime / 1E9 << std::endl;
             std::cout << "Total time: " << (dataManipulationTime / 1E9) + t.elapsedTime().seconds() << std::endl;
 
-            std::cout << "preprocessTime: " << retrArg->preprocessTime / 1E9 << std::endl;
-            std::cout << "ipTime: " << retrArg->ipTime / 1E9 << std::endl;
-            std::cout << "boundsTime: " << retrArg->boundsTime / 1E9 << std::endl;
-            std::cout << "scanTime: " << retrArg->scanTime / 1E9 << std::endl;
-            std::cout << "filterTime: " << retrArg->filterTime / 1E9 << std::endl;
+//            std::cout << "preprocessTime: " << retrArg->preprocessTime / 1E9 << std::endl;
+//            std::cout << "ipTime: " << retrArg->ipTime / 1E9 << std::endl;
+//            std::cout << "boundsTime: " << retrArg->boundsTime / 1E9 << std::endl;
+//            std::cout << "scanTime: " << retrArg->scanTime / 1E9 << std::endl;
+//            std::cout << "filterTime: " << retrArg->filterTime / 1E9 << std::endl;
 
 
             logging << "\t" << args.k << "\t" << retrArg->comparisons << "\t" << getResultSetSize() << "\t";
             printTimes(t);
-
-
             logging.close();
         }
 

@@ -42,6 +42,7 @@ int main(int argc, char *argv[]) {
 	string logFile, resultsFile;
 
 	bool querySideLeft = true;
+        bool isTARR = true;
 	int k;
 
 	// read command line
@@ -53,7 +54,8 @@ int main(int argc, char *argv[]) {
 				("theta", value<double>(&theta), "theta value")
 				("k", value<int>(&k)->default_value(0), "top k (default 0). If 0 Above-theta will run")
 				("querySideLeft", value<bool>(&querySideLeft)->default_value(true), "1 if Q^T contains the queries (default). Interesting for Row-Top-k")	   
-				("logFile", value<string>(&logFile)->default_value(""), "output File (contains runtime information)")
+                                ("isTARR", value<bool>(&isTARR)->default_value(true), "If 1 Round Robin schedule is used (default). Otherwise Max PiQi")			
+                                ("logFile", value<string>(&logFile)->default_value(""), "output File (contains runtime information)")
 				("resultsFile", value<string>(&resultsFile)->default_value(""), "output File (contains the results)")
                                
 				
@@ -81,7 +83,7 @@ int main(int argc, char *argv[]) {
 	args.k = k;
 	args.querySideLeft = querySideLeft;
         args.method = LEMP_TA;
-
+        args.isTARR = isTARR;
 
 
 	ta::TA_all algo(args);

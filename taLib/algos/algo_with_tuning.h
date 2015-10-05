@@ -38,7 +38,7 @@ namespace ta {
 
         std::vector<ProbeBucket> probeBuckets;
         std::vector<RetrievalArguments> retrArg; //one argument for each thread
-      
+
         row_type maxProbeBucketSize;
         LEMPArg args;
         std::ofstream logging;
@@ -103,8 +103,14 @@ namespace ta {
                     std::cout << "ALGO: LEMP_C" << std::endl;
                     break;
                 case LEMP_TA:
-                    logging << "LEMP_TA";
-                    std::cout << "ALGO: LEMP_TA" << std::endl;
+                    if (args.isTARR) {
+                        logging << "LEMP_TA RR";
+                        std::cout << "ALGO: LEMP_TA with RR "<< std::endl;
+                    } else {
+                        logging << "LEMP_TA MaxPiQi";
+                        std::cout << "ALGO: LEMP_TA with MaxPiQi " << std::endl;
+                    }
+                    
                     break;
                 case LEMP_TREE:
                     logging << "LEMP_TREE"; // my parallelization could lead to false sharing
@@ -323,16 +329,16 @@ namespace ta {
                     }
 
                 }
-                
-//                 std::cout<<"Done running thread: "<<tid<<std::endl;
+
+                //                 std::cout<<"Done running thread: "<<tid<<std::endl;
 
                 localToGlobalIds(retrArg[tid].topkResults, args.k, retrArg[tid].results, queryMatrices[tid]);
                 results[tid] = &retrArg[tid].results;
 
 
 
-		comparisons += retrArg[tid].comparisons;
-		
+                comparisons += retrArg[tid].comparisons;
+
             }
 
 
@@ -437,7 +443,7 @@ namespace ta {
                         probeBuckets[b].ptrIndexes[SL] = new QueueElementLists();
                 }
                 break;
-                
+
             case LEMP_I:
 #pragma omp parallel for schedule(static,1)
                 for (row_type b = b0; b < activeBuckets; b++) {
@@ -447,7 +453,7 @@ namespace ta {
                         probeBuckets[b].ptrIndexes[SL] = new QueueElementLists();
                 }
                 break;
-                
+
             case LEMP_LC:
 #pragma omp parallel for schedule(static,1)
                 for (row_type b = b0; b < activeBuckets; b++) {
@@ -467,7 +473,7 @@ namespace ta {
                         probeBuckets[b].ptrIndexes[INT_SL] = new IntLists();
                 }
                 break;
-                
+
             case LEMP_TA:
 #pragma omp parallel for schedule(static,1)
                 for (row_type b = b0; b < activeBuckets; b++) {
@@ -477,7 +483,7 @@ namespace ta {
                         probeBuckets[b].ptrIndexes[SL] = new QueueElementLists();
                 }
                 break;
-                
+
             case LEMP_L:
 #pragma omp parallel for schedule(static,1)
                 for (row_type b = b0; b < activeBuckets; b++) {
@@ -535,11 +541,13 @@ namespace ta {
         {
             row_type tid = omp_get_thread_num();
             std::vector<row_type> blockOffsets;
-            computeBlockOffsetsForUsersFixed(queryMatrices[tid].lengthInfo, queryMatrices[tid].rowNum, blockOffsets, args.cacheSizeinKB, queryMatrices[tid].colNum, args, maxBlockSize);
+            computeBlockOffsetsForUsersFixed(queryMatrices[tid].lengthInfo, queryMatrices[tid].rowNum, blockOffsets, args.cacheSizeinKB, 
+                    queryMatrices[tid].colNum, args, maxBlockSize);
             bucketize(retrArg[tid].queryBatches, queryMatrices[tid], blockOffsets, args);
 
             nCount += retrArg[tid].queryBatches.size();
-            retrArg[tid].initializeBasics(queryMatrices[tid], probeMatrix, args.method, args.theta, args.k, args.threads, args.R, args.epsilon);
+            retrArg[tid].initializeBasics(queryMatrices[tid], probeMatrix, args.method, args.theta, args.k, args.threads, args.R, 
+                    args.epsilon, true, args.isTARR);
 
         }
         logging << nCount << "\t";
@@ -597,21 +605,21 @@ namespace ta {
                 break;
 
             case LEMP_LSH:
-	      
+
 
 #pragma omp parallel for schedule(dynamic,1) 
                 for (row_type b = b0; b < activeBuckets; b++) {
-		     static_cast<LshIndex*> (probeBuckets[b].ptrIndexes[LSH])->initializeLists(probeMatrix, true, probeBuckets[b].startPos, probeBuckets[b].endPos);
-		     
-		     row_type signatures = LSH_SIGNATURES;//LSH_SIGNATURES/(b+1);
-		     if(retrArg.size() > 1 && signatures > 0){	
-			  row_type tid = omp_get_thread_num();
+                    static_cast<LshIndex*> (probeBuckets[b].ptrIndexes[LSH])->initializeLists(probeMatrix, true, probeBuckets[b].startPos, probeBuckets[b].endPos);
 
-			  static_cast<LshIndex*> (probeBuckets[b].ptrIndexes[LSH])->checkAndReallocateAll(&probeMatrix, true, probeBuckets[b].startPos, probeBuckets[b].endPos, signatures,
+                    row_type signatures = LSH_SIGNATURES; //LSH_SIGNATURES/(b+1);
+                    if (retrArg.size() > 1 && signatures > 0) {
+                        row_type tid = omp_get_thread_num();
+
+                        static_cast<LshIndex*> (probeBuckets[b].ptrIndexes[LSH])->checkAndReallocateAll(&probeMatrix, true, probeBuckets[b].startPos, probeBuckets[b].endPos, signatures,
                                 retrArg[tid].sums, retrArg[tid].countsOfBlockValues, retrArg[tid].sketches, retrArg[tid].rig);
-		    }	     
+                    }
                 }
-                
+
                 break;
 
         }
@@ -686,14 +694,14 @@ namespace ta {
                             if (b < activeBuckets) {
                                 probeBuckets[b].ptrRetriever->tuneTopk(probeBuckets[b], retrArg);
 
-//                                std::cout << b << "-->" << probeBuckets[b].t_b << " " << (int) probeBuckets[b].numLists << std::endl;
+                                //                                std::cout << b << "-->" << probeBuckets[b].t_b << " " << (int) probeBuckets[b].numLists << std::endl;
 
 
                             } else {
                                 probeBuckets[b].setAfterTuning(probeBuckets[b - 1].numLists, probeBuckets[b - 1].t_b);
                             }
 
-//                            probeBuckets[b].setAfterTuning(1, -1);
+                            //                            probeBuckets[b].setAfterTuning(1, -1);
                         }
 
                         t.stop();
