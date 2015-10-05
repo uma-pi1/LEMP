@@ -2,11 +2,13 @@ Apache mpi2
 Copyright 2015 The Apache Software Foundation
 
 
-The util part is code written by Rainer Gemulla licenced under Apache licence v2.0
+The util part is code written by Rainer Gemulla licenced under Apache licence v2.0.
 
-The code under the ap folder (containing code related to the L2AP method) is largely copy-paste from publicly available code licenced under MIT licence
+The code under the ap folder (containing code related to the L2AP method) is largely copy-paste from publicly available code licenced under MIT licence.
 
-The code under the my_mlpack folder (containing code related to the Cover Tree method) is largely copy-paste from publicly available code licenced under the 3-clause BSD licence
+The code under the lsh folder is largely based on code provided together  with the  L2AP package, implementing the BayesLSH method.
+
+The code under the my_mlpack folder (containing code related to the Cover Tree method) is largely copy-paste from publicly available code licenced under the 3-clause BSD licence.
 
 
 

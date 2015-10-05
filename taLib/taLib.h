@@ -42,12 +42,12 @@
 #include <taLib/ap/connect.h>
 /////////////////////////////////////
 
-// #include <taLib/lsh/RandomIntGaussians.h>
-// #include <taLib/lsh/CosineSketches.h>
-// #include <taLib/lsh/LshBins.h>
+#include <taLib/lsh/RandomIntGaussians.h>
+#include <taLib/lsh/CosineSketches.h>
+#include <taLib/lsh/LshBins.h>
 
 #include <taLib/structs/l2apIndex.h>
-// #include <taLib/structs/LshIndex.h>
+#include <taLib/structs/LshIndex.h>
 
 
 
@@ -71,7 +71,7 @@
 #include <taLib/retrieval/mixed.h>
 #include <taLib/retrieval/singleTree.h>
 #include <taLib/retrieval/apRetriever.h>
-// #include <taLib/retrieval/lshRetriever.h> 
+#include <taLib/retrieval/lshRetriever.h> 
 
 #include <taLib/algos/naiveAlgo.h>
 #include <taLib/algos/PCATree.h>

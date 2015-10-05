@@ -31,7 +31,7 @@ using namespace ta;
 using namespace boost::program_options;
 
 int main(int argc, char *argv[]) {
-    double theta, epsilon, gamma;
+    double theta, R, epsilon;
     string leftMatrix;
     string rightMatrix;
     string logFile, resultsFile;
@@ -49,8 +49,8 @@ int main(int argc, char *argv[]) {
             ("Q^T", value<string>(&leftMatrix), "file containing the query matrix (left side)")
             ("P", value<string>(&rightMatrix), "file containing the probe matrix (right side)")
             ("theta", value<double>(&theta), "theta value")
-            ("eps", value<double>(&epsilon)->default_value(0.03), "epsilon value (experimental)")
-	    ("gamma", value<double>(&gamma)->default_value(0.0), "gamma value (experimental)")
+            ("R", value<double>(&R)->default_value(0.97), "recall parameter for LSH")
+	    ("epsilon", value<double>(&epsilon)->default_value(0.0), "epsilon value for LEMP-LI with Absolute or Relative Approximation")
             ("querySideLeft", value<bool>(&querySideLeft)->default_value(true), "1 if Q^T contains the queries (default). Interesting for Row-Top-k")
             ("method", value<string>(&methodStr), "LEMP_X where X: L, LI, LC, I, C, TA, TREE, AP, BLSH")
             ("k", value<int>(&k)->default_value(0), "top k (default 0). If 0 Above-theta will run")
@@ -88,8 +88,8 @@ int main(int argc, char *argv[]) {
     args.querySideLeft = querySideLeft;
     args.cacheSizeinKB = cacheSizeinKB;
     args.threads = threads;
+    args.R = R;
     args.epsilon = epsilon;
-    args.gamma = gamma;
     
    
 

@@ -116,8 +116,8 @@ set(ta_all_HDRS
 add_library(ta SHARED ${ta_all_HDRS} ${ta_SRCS}) 
 
 # link with boost
-# target_link_libraries( ta rg armadillo ${Boost_LIBRARIES} blas lapack  GKlib)
-target_link_libraries( ta rg armadillo ${Boost_LIBRARIES} blas lapack ${GSL_LIBRARIES} GKlib)
+target_link_libraries( ta rg armadillo ${Boost_LIBRARIES} blas lapack  GKlib)
+# target_link_libraries( ta rg armadillo ${Boost_LIBRARIES} blas lapack ${GSL_LIBRARIES} GKlib)
 
 
 # install library and main headers

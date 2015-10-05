@@ -33,7 +33,7 @@ namespace ta {
 
     public:
 
-//         LshIndex * lshIndex;
+        LshIndex * lshIndex;
         row_type startPos, endPos, rowNum;
         row_type inactiveCounter;
         bool initializedQueues;
@@ -48,22 +48,22 @@ namespace ta {
         }
   
 
-//         inline void createLshIndex(const VectorMatrix& matrix) {
-//             lshIndex = new LshIndex();
-//             lshIndex->initializeLists(matrix, false, startPos, endPos);
-//         }
+        inline void createLshIndex(const VectorMatrix& matrix) {
+            lshIndex = new LshIndex();
+            lshIndex->initializeLists(matrix, false, startPos, endPos);
+        }
 
 
         inline QueryBucket_withTuning() : initializedQueues(false), queues(0),
-        inactiveCounter(0){//,  lshIndex(NULL){
+        inactiveCounter(0),  lshIndex(NULL){
         };
 
         inline ~QueryBucket_withTuning() {
             if (queues != NULL)
                 delete[] queues;
 
-//             if (lshIndex != NULL)
-//                 delete lshIndex;
+            if (lshIndex != NULL)
+                delete lshIndex;
         }
 
         inline void init(const VectorMatrix& matrix, row_type startInd, row_type endInd, LEMPArg& args) {

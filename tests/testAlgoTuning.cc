@@ -37,17 +37,20 @@ using namespace rg;
 int main() {
 
     LEMPArg args;
-    args.theta = 0.035;
-//        args.k = 50;
+//     args.theta = 0.035;
+       args.k = 10;
 //        args.querySideLeft = false;
     args.method = LEMP_LI;
     args.cacheSizeinKB = 2048;
-    args.threads = 2;
+    args.threads = 1;
     args.epsilon = 0.3;
 
 
     args.usersFile = "/home/chteflio/data/ta-data/w-50-gnmf-zero.mma";
     args.itemsFile = "/home/chteflio/data/ta-data/h-50-gnmf-zero.mma";
+    
+//     args.usersFile = "/home/chteflio/data/ta-data/w50-net-noav.mma";
+//     args.itemsFile = "/home/chteflio/data/ta-data/h50-net-noav.mma";
 
 
     args.logFile = "/home/chteflio/workspace/Log.txt";

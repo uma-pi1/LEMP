@@ -67,9 +67,9 @@ public:
                 if(ptrIndexes[AP] != 0){
 			delete static_cast<L2apIndex*>(ptrIndexes[AP]);
 		}
-//                 if(ptrIndexes[LSH] != 0){
-//                     delete static_cast<LshIndex*>(ptrIndexes[LSH]);
-//                 }
+                if(ptrIndexes[LSH] != 0){
+                    delete static_cast<LshIndex*>(ptrIndexes[LSH]);
+                }
 	}
 
 	inline  void init(const VectorMatrix& matrix, row_type startInd, row_type endInd, LEMPArg& args){

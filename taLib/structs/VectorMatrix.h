@@ -82,7 +82,7 @@ namespace ta {
         std::vector<QueueElement> lengthInfo; // data: length id: vectorId
 
 
-        std::vector<double> gammaEquivalents;
+        std::vector<double> epsilonEquivalents;
 
         // for simd instruction  
         int sizeDiv2;
@@ -480,7 +480,7 @@ namespace ta {
 
     /*  map: id: original matrix id, first: thread second: posInMatrix
      */
-    inline void initializeMatrices(VectorMatrix& originalMatrix, std::vector<VectorMatrix>& matrices, bool sort, bool ignoreLengths, double gamma = 0) {
+    inline void initializeMatrices(VectorMatrix& originalMatrix, std::vector<VectorMatrix>& matrices, bool sort, bool ignoreLengths, double epsilon = 0) {
 
         row_type threads = matrices.size();
 
@@ -516,7 +516,7 @@ namespace ta {
             if (ignoreLengths) {
 
 #ifdef ABS_APPROX
-                matrices[0].gammaEquivalents.resize(matrices[0].rowNum, gamma);
+                matrices[0].epsilonEquivalents.resize(matrices[0].rowNum, epsilon);
 #endif
 
 
@@ -532,7 +532,7 @@ namespace ta {
                     matrices[0].setLengthInData(i, 1);
                     double x = 1 / len;
 #ifdef ABS_APPROX
-                    matrices[0].gammaEquivalents[i] *= x;
+                    matrices[0].epsilonEquivalents[i] *= x;
                     //                    std::cout<<"len: "<<len<<" 1/len: "<<x<<" "<<matrices[0].gammaEquivalents[i]<<std::endl;
 #endif
 
@@ -630,7 +630,7 @@ namespace ta {
                 if (ignoreLengths) {
 
 #ifdef ABS_APPROX
-                    matrices[tid].gammaEquivalents.resize(matrices[tid].rowNum, gamma);
+                    matrices[tid].epsilonEquivalents.resize(matrices[tid].rowNum, epsilon);
 #endif
 
                     for (int i = start; i < end; i++) {
@@ -652,7 +652,7 @@ namespace ta {
 
                         double x = 1 / len;
 #ifdef ABS_APPROX
-                        matrices[tid].gammaEquivalents[i] *= x;
+                        matrices[tid].epsilonEquivalents[i] *= x;
 #endif
 
                         double * d1 = matrices[tid].getMatrixRowPtr(i - start);

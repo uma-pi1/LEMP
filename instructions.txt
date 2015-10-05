@@ -31,7 +31,6 @@ If you are compiling Armadillo by hand, ensure that LAPACK and BLAS are enabled.
 A compatible version of this library is included in LEMP/GKlib
 If you do not already have GKlib installed, cd to GKlib, and read BUILD.txt for installation instructions. GKlib requires CMake 2.8 to build.
 
-Additionally for BLSH-Lite you will also need the  GSL  library
 
 
 1.3. For LEMP: Boost (tried on 1.49)
@@ -66,23 +65,23 @@ The datasets used in the paper "LEMP: Fast Retrieval of Large Entries in a Matri
 cd to build/tools. The executable running lemp is called runAlgoWithTuner. Type ./runAlgoWithTuner to see the parameters
 
 Options:
-  --help                            produce help message
-  --Q^T arg                         file containing the query matrix (left
-                                    side)
-  --P arg                           file containing the probe matrix (right
-                                    side)
-  --theta arg                       theta value
-  --eps arg (=0.029999999999999999) epsilon value (experimental)
-  --querySideLeft arg (=1)          1 if Q^T contains the queries (default).
-                                    Interesting for Row-Top-k
-  --method arg                      LEMP_X where X: L, LI, LC, I, C, TA, TREE,
-                                    AP, LSH
-  --k arg (=0)                      top k (default 0). If 0 Above-theta will
-                                    run
-  --logFile arg            	    output File (contains runtime information)
-  --resultsFile arg        	    output File (contains the results)
-  --cacheSizeinKB arg (=8192)       cache size in KB
-  --t arg (=1)                      num of threads (default 1)
+
+  --help                         produce help message
+  --Q^T arg                      file containing the query matrix (left side)
+  --P arg                        file containing the probe matrix (right side)
+  --theta arg                    theta value
+  --R arg (=0.96999999999999997) recall parameter for LEMP_LSH
+  --epsilon arg (=0)             epsilon value for LEMP-LI with Absolute or
+                                 Relative Approximation
+  --querySideLeft arg (=1)       1 if Q^T contains the queries (default).
+                                 Interesting for Row-Top-k
+  --method arg                   LEMP_X where X: L, LI, LC, I, C, TA, TREE, AP,LSH
+  --k arg (=0)                   top k (default 0). If 0 Above-theta will run
+  --logFile arg                  output File (contains runtime information)
+  --resultsFile arg              output File (contains the results)
+  --cacheSizeinKB arg (=8192)    cache size in KB
+  --t arg (=1)                   num of threads (default 1)
+
 
 
 
@@ -99,6 +98,13 @@ LEMP_TREE: like LEMP_I but with the cover trees algorithm instead of INCR. Note 
 
 LEMP_LI: like LEMP_I, but in this case within a bucket lemp can use either LENGTH or INCR depending on the query vector and the bucket's properties
 LEMP_LC: like LEMP_LC, but with COORD instead of INCR.
+
+LEMP_LSH: a combination of LSH and L within buckets
+
+For the approximate LEMP-REL and LEMP-ABS you will have to uncomment the flags RELATIVE_APPROX or ABS_APPROX within the taLib/structs/Definitions.h and recompile. Then by using LEMP_LI you use the approximate version.
+Notice that LEMP uses a couple of space-optimizations at compile time. This means that LEMP might ask you to change a parameter in a file and recompile depending on the size of your dataset. 
+If you want to further speed up the inner product computation uncomment the flag WITH_SIMD in taLib/structs/Definitions.h and recompile.
+If you want to further speed up the ICOORD/INCR scanning uncomment the flag WITH_SIMD_INCR in taLib/structs/Definitions.h and recompile.
 
 According to our experiments, the best performing method was LEMP_LI. In the following you can see some examples:
 
@@ -177,10 +183,7 @@ Options:
   
   
   
-Notice that LEMP uses a couple of space-optimizations at compile time. This means that LEMP might ask you to change a parameter in a file and recompile depending on the size of your dataset. 
-If you want to further speed up the inner product computation uncomment the flag WITH_SIMD in taLib/structs/Definitions.h and recompile.
-If you want to further speed up the ICOORD/INCR scanning uncomment the flag WITH_SIMD_INCR in taLib/structs/Definitions.h and recompile.
-For using approximations like LEMP-REL and LEMP-ABS, you need to uncomment the flag RELATIVE_APPROX or ABS_APPROX and recompile. After that whenever you run LEMP-L, LEMP-I or LEMP-LI the approximate version will run.
+
 
 Did you find any bugs? Do you have questions? Feel free to contact us: chteflio@mpi-inf.mpg.de
 

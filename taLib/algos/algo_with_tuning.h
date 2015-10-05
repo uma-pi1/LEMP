@@ -118,8 +118,8 @@ namespace ta {
                     logging << "LEMP_LSH";
                     std::cout << "ALGO: LEMP_LSH" << std::endl;
                     std::cout << "Max LSH signatures: " << LSH_SIGNATURES << std::endl;
-                    std::cout << "Recall rate: " << 1 - args.epsilon << std::endl;
-//                    gsl_set_error_handler_off();
+                    std::cout << "Recall rate: " << args.R << std::endl;
+
                     break;
             }
 
@@ -506,15 +506,15 @@ namespace ta {
                 }
                 break;
 
-//             case LEMP_LSH:
-// #pragma omp parallel for schedule(static,1)
-//                 for (row_type b = b0; b < activeBuckets; b++) {
-//                     retriever_ptr rPtr(new LshRetriever());
-//                     probeBuckets[b].ptrRetriever = rPtr;
-//                     if (probeBuckets[b].ptrIndexes[LSH] == 0)
-//                         probeBuckets[b].ptrIndexes[LSH] = new LshIndex();
-//                 }
-//                 break;
+            case LEMP_LSH:
+#pragma omp parallel for schedule(static,1)
+                for (row_type b = b0; b < activeBuckets; b++) {
+                    retriever_ptr rPtr(new LshRetriever());
+                    probeBuckets[b].ptrRetriever = rPtr;
+                    if (probeBuckets[b].ptrIndexes[LSH] == 0)
+                        probeBuckets[b].ptrIndexes[LSH] = new LshIndex();
+                }
+                break;
         }
     }
 
@@ -525,7 +525,7 @@ namespace ta {
 
 
         if (args.k > 0) { // this is a top-k version
-            initializeMatrices(leftMatrix, queryMatrices, false, true, args.gamma); // normalize but don't sort
+            initializeMatrices(leftMatrix, queryMatrices, false, true, args.epsilon); // normalize but don't sort
         } else {
             initializeMatrices(leftMatrix, queryMatrices, true, false); // normalize and sort
         }
@@ -539,7 +539,7 @@ namespace ta {
             bucketize(retrArg[tid].queryBatches, queryMatrices[tid], blockOffsets, args);
 
             nCount += retrArg[tid].queryBatches.size();
-            retrArg[tid].initializeBasics(queryMatrices[tid], probeMatrix, args.method, args.theta, args.k, args.threads, args.epsilon, args.gamma);
+            retrArg[tid].initializeBasics(queryMatrices[tid], probeMatrix, args.method, args.theta, args.k, args.threads, args.R, args.epsilon);
 
         }
         logging << nCount << "\t";
@@ -596,23 +596,23 @@ namespace ta {
                 }
                 break;
 
-//             case LEMP_LSH:
-// 	      
-// 
-// #pragma omp parallel for schedule(dynamic,1) 
-//                 for (row_type b = b0; b < activeBuckets; b++) {
-// 		     static_cast<LshIndex*> (probeBuckets[b].ptrIndexes[LSH])->initializeLists(probeMatrix, true, probeBuckets[b].startPos, probeBuckets[b].endPos);
-// 		     
-// 		     row_type signatures = LSH_SIGNATURES;//LSH_SIGNATURES/(b+1);
-// 		     if(retrArg.size() > 1 && signatures > 0){	
-// 			  row_type tid = omp_get_thread_num();
-// 
-// 			  static_cast<LshIndex*> (probeBuckets[b].ptrIndexes[LSH])->checkAndReallocateAll(&probeMatrix, true, probeBuckets[b].startPos, probeBuckets[b].endPos, signatures,
-//                                 retrArg[tid].sums, retrArg[tid].countsOfBlockValues, retrArg[tid].sketches, retrArg[tid].rig);
-// 		    }	     
-//                 }
-//                 
-//                 break;
+            case LEMP_LSH:
+	      
+
+#pragma omp parallel for schedule(dynamic,1) 
+                for (row_type b = b0; b < activeBuckets; b++) {
+		     static_cast<LshIndex*> (probeBuckets[b].ptrIndexes[LSH])->initializeLists(probeMatrix, true, probeBuckets[b].startPos, probeBuckets[b].endPos);
+		     
+		     row_type signatures = LSH_SIGNATURES;//LSH_SIGNATURES/(b+1);
+		     if(retrArg.size() > 1 && signatures > 0){	
+			  row_type tid = omp_get_thread_num();
+
+			  static_cast<LshIndex*> (probeBuckets[b].ptrIndexes[LSH])->checkAndReallocateAll(&probeMatrix, true, probeBuckets[b].startPos, probeBuckets[b].endPos, signatures,
+                                retrArg[tid].sums, retrArg[tid].countsOfBlockValues, retrArg[tid].sketches, retrArg[tid].rig);
+		    }	     
+                }
+                
+                break;
 
         }
         t1.stop();

@@ -41,13 +41,13 @@
 #define LOWER_LIMIT_PER_BUCKET  20
 #define NUM_LISTS    10
 
-//#define RELATIVE_APPROX
-//#define ABS_APPROX
+// #define RELATIVE_APPROX
+// #define ABS_APPROX
 
 
 // for probeBuckets
 #define NUM_INDEXES 6 // 0: no index 1: sorted list 2: int sorted list 3: tree 4: AP 5:BLSH 6:LSH
-#define LSH_SIGNATURES 280//200 //so that if I am about to get more than 80% of the probe vectors I will run length || only multiples of 4 please
+#define LSH_SIGNATURES 200//200 //so that if I am about to get more than 80% of the probe vectors I will run length || only multiples of 4 please
 #define LSH_CODE_LENGTH 8
 
 
