@@ -83,39 +83,23 @@ namespace ta {
                 delete retrArg;
         }
 
-
-        void multiply() {// for parallel execution
+        void multiply() {
             rg::Timer t;
             retrArg->comparisons = 0;
             LengthRetriever plainRetriever;
-            comp_type comparisons = 0;
+
             t.start();
-
-            omp_set_num_threads(args.threads);
-
-#pragma omp parallel reduction(+ : comparisons)
-            {
-
-                RetrievalArguments arg(probeMatrix.colNum, &queryMatrix, &probeMatrix, args.method);
-                arg.theta = args.theta;
-
-#pragma omp for schedule(dynamic,10)  
-                for (row_type i = 0; i < queryMatrix.rowNum; i++) {
-                    double* query = queryMatrix.getMatrixRowPtr(i);
-                    arg.queryId = i;
-                    plainRetriever.naive(query, 0, probeMatrix.rowNum, &arg);
-                }
-
-                comparisons += arg.comparisons;
-
+            for (row_type i = 0; i < queryMatrix.rowNum; ++i) {
+                double* query = queryMatrix.getMatrixRowPtr(i);
+                retrArg->queryId = i;
+                plainRetriever.naive(query, 0, probeMatrix.rowNum, retrArg);
             }
-
             thetaResults = &(retrArg->results);
             t.stop();
 
-            std::cout << "TIME: " << t << std::endl;
-            std::cout << "Result Size: " << getResultSetSize() << std::endl;
-            std::cout << "Number of comparisons: " << comparisons << std::endl;
+            std::cout << "TIME for 2 sided: " << t << std::endl;
+            std::cout << "Result Size: " << getResultSetSize() << " " << (retrArg->results).size() << std::endl;
+            std::cout << "Number of comparisons: " << retrArg->comparisons << std::endl;
 
             if (args.resultsFile != "") {
                 std::vector< std::vector<MatItem >* > resultsForWriting;
@@ -124,64 +108,31 @@ namespace ta {
             }
         }
 
-
         void topKperUser() {
             rg::Timer timer;
             retrArg->comparisons = 0;
+            LengthRetriever plainRetriever;
 
             timer.start();
-            retrArg->allocTopkResults();
-            comp_type comparisons = 0;
-            omp_set_num_threads(args.threads);
 
-            std::cout << "Start Top k retrieval" << std::endl;
+            retrArg->topkResults.resize(queryMatrix.rowNum * args.k);
+            retrArg->heap.resize(args.k);
 
-#pragma omp parallel reduction(+ : comparisons)
-            {
+            for (row_type i = 0; i < queryMatrix.rowNum; ++i) {
 
-                RetrievalArguments arg(probeMatrix.colNum, &queryMatrix, &probeMatrix, args.method);
-                arg.theta = args.theta;
-                arg.k = args.k;
-                arg.heap.resize(args.k);
+                double* query = queryMatrix.getMatrixRowPtr(i);
+                retrArg->queryId = i;
 
-#pragma omp for schedule(dynamic,10)
-                for (row_type i = 0; i < queryMatrix.rowNum; i++) {
-
-                    double* query = queryMatrix.getMatrixRowPtr(i);
-                    arg.queryId = i;
-
-                    for (row_type j = 0; j < args.k; j++) {
-                        double ip = queryMatrix.innerProduct(i, probeMatrix.getMatrixRowPtr(j));
-                        arg.comparisons++;
-                        arg.heap[j] = QueueElement(ip, j);
-                    }
-
-                    std::make_heap(arg.heap.begin(), arg.heap.end(), std::greater<QueueElement>()); //make the heap;
-
-
-                    double minScore = arg.heap.front().data;
-
-                    for (row_type j = args.k; j < probeMatrix.rowNum; j++) {
-                        arg.comparisons++;
-                        double ip = arg.probeMatrix->innerProduct(j, query);
-
-                        if (ip > minScore) {
-                            std::pop_heap(arg.heap.begin(), arg.heap.end(), std::greater<QueueElement>());
-                            arg.heap.pop_back();
-                            arg.heap.push_back(QueueElement(ip, arg.probeMatrix->getId(j)));
-                            std::push_heap(arg.heap.begin(), arg.heap.end(), std::greater<QueueElement>());
-                            minScore = arg.heap.front().data;
-                        }
-                    }
-
-                    row_type p = i * args.k;
-                    std::copy(arg.heap.begin(), arg.heap.end(), retrArg->topkResults.begin() + p);
+                for (row_type j = 0; j < args.k; ++j) {
+                    double ip = queryMatrix.innerProduct(i, probeMatrix.getMatrixRowPtr(j));
+                    retrArg->comparisons++;
+                    retrArg->heap[j] = QueueElement(ip, j);
                 }
 
-                comparisons += arg.comparisons;
+                std::make_heap(retrArg->heap.begin(), retrArg->heap.end(), std::greater<QueueElement>()); //make the heap;
+                plainRetriever.naiveTopk(query, retrArg->k, probeMatrix.rowNum, retrArg);
+                retrArg->writeHeapToTopk(i);
             }
-
-
 
 
             topkResults = &(retrArg->topkResults);
@@ -189,7 +140,8 @@ namespace ta {
 
             std::cout << "TIME for 2 sided: " << timer << std::endl;
             std::cout << "Result Size: " << getResultSetSize() << std::endl;
-            std::cout << "Number of comparisons: " << comparisons << std::endl;
+            std::cout << "Number of comparisons: " << retrArg->comparisons << std::endl;
+
 
             if (args.resultsFile != "") {
                 std::vector<MatItem> results;
@@ -198,9 +150,6 @@ namespace ta {
                 resultsForWriting.push_back(&results);
                 writeResults(resultsForWriting, args.resultsFile);
             }
-
-
-            logging << "\t" << args.k << "\t" << comparisons << "\t" << getResultSetSize() << "\t" << timer << "\n";
 
         }
 
