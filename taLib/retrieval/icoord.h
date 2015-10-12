@@ -32,8 +32,8 @@ namespace ta {
 
         ListTuneData dataForTuning;
 
-        IncrRetriever() : Retriever(LEMP_I) {
-        };
+        IncrRetriever() = default;
+        ~IncrRetriever() = default;
 
         inline virtual void run(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) {
 
@@ -58,8 +58,7 @@ namespace ta {
 
             if (shouldScan) {
 
-                if (arg->numLists == 1) {// ||arg->intervals[0].end-arg->intervals[0].start < 10 || arg->intervals[0].end-arg->intervals[0].start < 0.05 * (probeBucket.endPos-probeBucket.startPos)){ // scan only one list
-
+                if (arg->numLists == 1) {
                     scanOnly1List(query, probeBucket, arg, invLists, false);
 
                 } else {
@@ -74,12 +73,12 @@ namespace ta {
                     QueueElement* entry = invLists->getElement(arg->intervals[0].start);
                     row_type length = arg->intervals[0].end - arg->intervals[0].start;
 
-                    for (row_type i = 0; i < length; i++) {
-                        arg->ext_cp_array[entry[i].id].addFirst(qi, entry[i].data); ///////////////////
+                    for (row_type i = 0; i < length; ++i) {
+                        arg->ext_cp_array[entry[i].id].addFirst(qi, entry[i].data);
                     }
 
                     // add Candidates
-                    for (col_type j = 1; j < arg->numLists; j++) {
+                    for (col_type j = 1; j < arg->numLists; ++j) {
                         qi = query[arg->intervals[j].col];
 
                         if (qi == 0)
@@ -90,8 +89,8 @@ namespace ta {
                         entry = invLists->getElement(arg->intervals[j].start);
                         length = arg->intervals[j].end - arg->intervals[j].start;
 
-                        for (row_type i = 0; i < length; i++) {
-                            arg->ext_cp_array[entry[i].id].add(qi, entry[i].data); ////////////////////////
+                        for (row_type i = 0; i < length; ++i) {
+                            arg->ext_cp_array[entry[i].id].add(qi, entry[i].data);
                         }
 
                     }
@@ -103,13 +102,12 @@ namespace ta {
                     arg->t.start();
 #endif
                     // run first scan again to find items to verify
-
                     entry = invLists->getElement(arg->intervals[0].start);
                     length = arg->intervals[0].end - arg->intervals[0].start;
 
-                    for (row_type i = 0; i < length; i++) {
+                    for (row_type i = 0; i < length; ++i) {
                         row_type row = entry[i].id;
-                        double len = query[-1] * arg->probeMatrix->lengthInfo[row + probeBucket.startPos].data; //.getVectorLength(row+probeBucket.startPos);
+                        double len = query[-1] * arg->probeMatrix->lengthInfo[row + probeBucket.startPos].data;
 
                         if (!arg->ext_cp_array[row].prune(len, arg->theta, seenQi2)) {
                             arg->candidatesToVerify[numCandidatesToVerify] = row + probeBucket.startPos;
@@ -136,14 +134,10 @@ namespace ta {
 
         inline virtual void run(QueryBucket_withTuning& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) {
 #ifdef TIME_IT
-            //std::cout<<" INCR-based retrieval running "<<std::endl;
             arg->t.start();
 #endif
-            // this can go out of the loop. I run incr for all
             if (!queryBatch.initializedQueues) { //preprocess              
                 queryBatch.preprocess(*(arg->queryMatrix), arg->maxLists);
-
-                //                arg->queryMatrix->preprocessQueues(queryBatch.startPos, queryBatch.endPos);                
                 queryBatch.initializedQueues = true;
             }
 #ifdef TIME_IT
@@ -154,15 +148,13 @@ namespace ta {
             arg->numLists = probeBucket.numLists;
 
 
-            for (row_type i = queryBatch.startPos; i < queryBatch.endPos; i++) {
+            for (row_type i = queryBatch.startPos; i < queryBatch.endPos; ++i) {
                 const double* query = arg->queryMatrix->getMatrixRowPtr(i);
 
                 if (query[-1] < probeBucket.bucketScanThreshold)// skip all users from this point on for this bucket
                     break;
 
                 col_type* localQueue = queryBatch.getQueue(i - queryBatch.startPos, arg->maxLists);
-
-                //                col_type* localQueue = arg->queryMatrix->getQueue(i);           
                 arg->setQueues(localQueue);
                 arg->queryId = arg->queryMatrix->getId(i);
 
@@ -191,7 +183,6 @@ namespace ta {
 
             double seenQi2 = 1;
             col_type validLists = arg->numLists;
-            double prevSeenQi2 = 1;
 
             QueueElementLists* invLists = static_cast<QueueElementLists*> (probeBucket.getIndex(SL));
 
@@ -221,34 +212,27 @@ namespace ta {
             if (shouldScan) {
 
 
-                if (validLists == 1) {// || arg->intervals[0].end-arg->intervals[0].start < 10 || arg->intervals[0].end-arg->intervals[0].start < 0.05 * (probeBucket.endPos-probeBucket.startPos)){ // scan only one list
-
+                if (validLists == 1) {
                     scanOnly1ListTopk(query, probeBucket, arg, invLists, true);
-
                 } else {
 #ifdef TIME_IT
                     arg->t.start();
 #endif
                     //initialize
-
                     qi = query[arg->intervals[0].col];
-
-
-
                     seenQi2 -= qi * qi;
 
                     QueueElement* entry = invLists->getElement(arg->intervals[0].start);
                     row_type length = arg->intervals[0].end - arg->intervals[0].start;
 
-                    for (row_type i = 0; i < length; i++) {
-
+                    for (row_type i = 0; i < length; ++i) {
                         arg->ext_cp_array[entry[i].id].addFirst(qi, entry[i].data);
                     }
 
 
 
                     // add Candidates
-                    for (int j = 1; j < validLists; j++) {
+                    for (int j = 1; j < validLists; ++j) {
                         qi = query[arg->intervals[j].col];
 
                         if (qi == 0)
@@ -260,7 +244,7 @@ namespace ta {
                         entry = invLists->getElement(arg->intervals[j].start);
                         length = arg->intervals[j].end - arg->intervals[j].start;
 
-                        for (row_type i = 0; i < length; i++) {
+                        for (row_type i = 0; i < length; ++i) {
                             arg->ext_cp_array[entry[i].id].add(qi, entry[i].data);
                         }
 
@@ -271,14 +255,12 @@ namespace ta {
                     arg->t.start();
 #endif
                     // run first scan again to find items to verify
-
                     entry = invLists->getElement(arg->intervals[0].start);
                     length = arg->intervals[0].end - arg->intervals[0].start;
 
-                    for (row_type i = 0; i < length; i++) {
+                    for (row_type i = 0; i < length; ++i) {
                         row_type row = entry[i].id;
-                        double len = arg->probeMatrix->lengthInfo[row + probeBucket.startPos].data; //.getVectorLength(row+probeBucket.startPos);
-
+                        double len = arg->probeMatrix->lengthInfo[row + probeBucket.startPos].data;
                         double privTheta = arg->heap.front().data;
 #ifdef RELATIVE_APPROX
                         privTheta *= arg->currGammaAppr;
@@ -324,7 +306,7 @@ namespace ta {
             QueueElement* entry = invLists->getElement(arg->intervals[0].start);
             row_type length = arg->intervals[0].end - arg->intervals[0].start;
 
-            for (row_type i = 0; i < length; i++) {
+            for (row_type i = 0; i < length; ++i) {
                 arg->candidatesToVerify[numCandidatesToVerify] = entry[i].id + probeBucket.startPos;
                 numCandidatesToVerify++;
             }
@@ -349,11 +331,10 @@ namespace ta {
             arg->t.start();
 #endif          
             row_type numCandidatesToVerify = 0;
-
             QueueElement* entry = invLists->getElement(arg->intervals[0].start);
             row_type length = arg->intervals[0].end - arg->intervals[0].start;
 
-            for (row_type i = 0; i < length; i++) {
+            for (row_type i = 0; i < length; ++i) {
                 arg->candidatesToVerify[numCandidatesToVerify] = entry[i].id + probeBucket.startPos;
                 numCandidatesToVerify++;
             }
@@ -379,7 +360,6 @@ namespace ta {
             // this can go out of the loop. I run incr for all
             if (!queryBatch.initializedQueues) { //preprocess
                 queryBatch.preprocess(*(arg->queryMatrix), arg->maxLists);
-                //                arg->queryMatrix->preprocessQueues(queryBatch.startPos, queryBatch.endPos);       
                 queryBatch.initializedQueues = true;
             }
 #ifdef TIME_IT
@@ -395,13 +375,10 @@ namespace ta {
             int end = queryBatch.endPos * arg->k;
             for (row_type i = start; i < end; i += arg->k) {
 
-                //                std:cout<<"i: "<<i<<" user: "<<user
                 if (queryBatch.inactiveQueries[user - queryBatch.startPos]) {
                     user++;
                     continue;
                 }
-
-
                 const double* query = arg->queryMatrix->getMatrixRowPtr(user);
 
                 double minScore = arg->topkResults[i].data;
@@ -431,13 +408,11 @@ namespace ta {
 
                 arg->queryId = arg->queryMatrix->getId(user);
                 col_type* localQueue = queryBatch.getQueue(user - queryBatch.startPos, arg->maxLists);
-                //                col_type* localQueue = arg->queryMatrix->getQueue(user);
                 arg->setQueues(localQueue);
 
                 runTopK(query, probeBucket, arg);
 
                 arg->writeHeapToTopk(user);
-
                 user++;
             }
 
@@ -464,20 +439,17 @@ namespace ta {
             arg->numLists = probeBucket.numLists;
 
 
-            for (row_type q = 0; q < arg->queryBatches.size(); q++) {
+            for (auto& queryBatch : arg->queryBatches) {
 
-                if (arg->queryBatches[q].inactiveCounter == arg->queryBatches[q].rowNum)
+                if (queryBatch.inactiveCounter == queryBatch.rowNum)
                     continue;
 
-                QueryBucket_withTuning& queryBatch = arg->queryBatches[q];
 
 #ifdef TIME_IT
                 arg->t.start();
 #endif
-                // this can go out of the loop. I run incr for all
                 if (!queryBatch.initializedQueues) { //preprocess
                     queryBatch.preprocess(*(arg->queryMatrix), arg->maxLists);
-                    //                arg->queryMatrix->preprocessQueues(queryBatch.startPos, queryBatch.endPos);       
                     queryBatch.initializedQueues = true;
                 }
 #ifdef TIME_IT
@@ -485,15 +457,12 @@ namespace ta {
                 arg->preprocessTime += arg->t.elapsedTime().nanos();
 #endif
 
-
-
                 ///////////////////////////////////
                 row_type user = queryBatch.startPos;
                 int start = queryBatch.startPos * arg->k;
                 int end = queryBatch.endPos * arg->k;
                 for (row_type i = start; i < end; i += arg->k) {
 
-                    //                std:cout<<"i: "<<i<<" user: "<<user
                     if (queryBatch.inactiveQueries[user - queryBatch.startPos]) {
                         user++;
                         continue;
@@ -526,20 +495,15 @@ namespace ta {
                         user++;
                         continue;
                     }
+
                     arg->moveTopkToHeap(i);
-
-
-
                     arg->queryId = arg->queryMatrix->getId(user);
-
                     col_type* localQueue = queryBatch.getQueue(user - queryBatch.startPos, arg->maxLists);
-                    //                col_type* localQueue = arg->queryMatrix->getQueue(user);
                     arg->setQueues(localQueue);
 
                     runTopK(query, probeBucket, arg);
 
                     arg->writeHeapToTopk(user);
-
                     user++;
                 }
 
@@ -551,25 +515,17 @@ namespace ta {
 
             arg->numLists = probeBucket.numLists;
 
-            for (row_type q = 0; q < arg->queryBatches.size(); q++) {
+            for (auto& queryBatch : arg->queryBatches) {
 
-                if (arg->queryBatches[q].normL2.second < probeBucket.bucketScanThreshold) {
+                if (queryBatch.normL2.second < probeBucket.bucketScanThreshold) {
                     break;
                 }
 
-
-                QueryBucket_withTuning& queryBatch = arg->queryBatches[q];
-
-
 #ifdef TIME_IT
-                //std::cout<<" INCR-based retrieval running "<<std::endl;
                 arg->t.start();
 #endif
-                // this can go out of the loop. I run incr for all
                 if (!queryBatch.initializedQueues) { //preprocess              
-                    queryBatch.preprocess(*(arg->queryMatrix), arg->maxLists);
-
-                    //                arg->queryMatrix->preprocessQueues(queryBatch.startPos, queryBatch.endPos);                
+                    queryBatch.preprocess(*(arg->queryMatrix), arg->maxLists);          
                     queryBatch.initializedQueues = true;
                 }
 #ifdef TIME_IT
@@ -577,23 +533,17 @@ namespace ta {
                 arg->preprocessTime += arg->t.elapsedTime().nanos();
 #endif
 
-
-
-
-                for (row_type i = queryBatch.startPos; i < queryBatch.endPos; i++) {
+                for (row_type i = queryBatch.startPos; i < queryBatch.endPos; ++i) {
                     const double* query = arg->queryMatrix->getMatrixRowPtr(i);
 
                     if (query[-1] < probeBucket.bucketScanThreshold)// skip all users from this point on for this bucket
                         break;
 
-                    col_type* localQueue = queryBatch.getQueue(i - queryBatch.startPos, arg->maxLists);
-
-                    //                col_type* localQueue = arg->queryMatrix->getQueue(i);           
+                    col_type* localQueue = queryBatch.getQueue(i - queryBatch.startPos, arg->maxLists);    
                     arg->setQueues(localQueue);
                     arg->queryId = arg->queryMatrix->getId(i);
 
                     run(query, probeBucket, arg);
-
                 }
 
 

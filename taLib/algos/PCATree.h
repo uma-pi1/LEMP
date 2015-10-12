@@ -27,6 +27,8 @@ namespace ta {
         static comp_type nNextID = 0;
         return nNextID++;
     }
+    /* this files are for running the PCA-tree method AFTER the transformation of the input vectors. I.e. the datasets read need to be the transformed ones.
+     */
 
     struct PCA_tree {
         double median;
@@ -174,12 +176,13 @@ namespace ta {
 
         inline SearchWithPCATree(LEMPArg& args) : args(args), preprocessingTime(0), comparisons(0), minScore(0), retrievalTime(0), root(0) {
 	    VectorMatrix probeMatrix;
-            if (args.querySideLeft) {
-                queryMatrix.readFromFile(args.usersFile, true);
-                probeMatrix.readFromFile(args.itemsFile, false);
+            
+             if (args.querySideLeft) {
+                queryMatrix.readFromFile(args.usersFile, args.r, args.m, true);
+                probeMatrix.readFromFile(args.itemsFile, args.r, args.n, false);
             } else {
-                queryMatrix.readFromFile(args.itemsFile, false);
-                probeMatrix.readFromFile(args.usersFile, true);
+                queryMatrix.readFromFile(args.itemsFile, args.r, args.n, false);
+                probeMatrix.readFromFile(args.usersFile, args.r, args.m, true);
             }
 
 
@@ -215,8 +218,6 @@ namespace ta {
         }
 
         ~SearchWithPCATree() {
-
-
         }
 
         inline void topKperUser() {
@@ -247,9 +248,6 @@ namespace ta {
                 // now scan also buckets in hamming distance=1
                 for (comp_type b = 0; b < matricesInLeaves.size(); b++) {
 
-		    
-		
-
                     if (queryBucket == b ||  matricesInLeaves[b]->rowNum == 0)
                         continue;
 
@@ -269,9 +267,7 @@ namespace ta {
             t.stop();
             retrievalTime = t.elapsedTime().nanos();
 
-
             localToGlobalIds(topkResults, args.k, results, queryMatrix);
-
 
             std::cout << "Time for Retrieval: " << (retrievalTime / 1E9) << std::endl;
             std::cout << "Size of result: " << results.size() << std::endl;

@@ -33,30 +33,29 @@ namespace ta {
     inline void verifyCandidates_lengthTest(const double * query, row_type numCandidatesToVerify, RetrievalArguments* arg) {
         std::pair<bool, double> p;
 
-        for (row_type i = 0; i < numCandidatesToVerify; i++) {
+        for (row_type i = 0; i < numCandidatesToVerify; ++i) {
             row_type row = arg->candidatesToVerify[i];
-            arg->comparisons++;
             p = arg->probeMatrix->passesThreshold(row, query, arg->theta);
 
             if (p.first) {
-                arg->results.push_back(MatItem(p.second, arg->queryId, arg->probeMatrix->getId(row)));
+                arg->results.emplace_back(p.second, arg->queryId, arg->probeMatrix->getId(row));
             }
         }
+        arg->comparisons += numCandidatesToVerify;
 
     }
 
     inline void verifyCandidates_noLengthTest(const double * query, row_type numCandidatesToVerify,  RetrievalArguments* arg) {       
 
-        for (row_type i = 0; i < numCandidatesToVerify; i++) {
+        for (row_type i = 0; i < numCandidatesToVerify; ++i) {
             row_type row = arg->candidatesToVerify[i];
-            arg->comparisons++;
             double ip = arg->probeMatrix->innerProduct(row, query);
 
-            if (ip >= arg->theta) {
-               
-                arg->results.push_back(MatItem(ip, arg->queryId, arg->probeMatrix->getId(row)));
+            if (ip >= arg->theta) {               
+                 arg->results.emplace_back(ip, arg->queryId, arg->probeMatrix->getId(row));
             }
         }
+        arg->comparisons += numCandidatesToVerify;
 
     }
 
@@ -67,20 +66,19 @@ namespace ta {
 
         double minScore = arg->heap.front().data;
 
-        for (row_type i = 0; i < numCandidatesToVerify; i++) {
+        for (row_type i = 0; i < numCandidatesToVerify; ++i) {
             row_type row = arg->candidatesToVerify[i];
-
             double ip = arg->probeMatrix->innerProduct(row, query);
-            arg->comparisons++;
 
             if (ip > minScore) {
                 std::pop_heap(arg->heap.begin(), arg->heap.end(), std::greater<QueueElement>());
                 arg->heap.pop_back();
-                arg->heap.push_back(QueueElement(ip,  arg->probeMatrix->getId(row)));
+                arg->heap.emplace_back(ip,  arg->probeMatrix->getId(row));
                 std::push_heap(arg->heap.begin(), arg->heap.end(), std::greater<QueueElement>());
                 minScore = arg->heap.front().data;
             }
         }
+        arg->comparisons += numCandidatesToVerify;
 
     }
 
@@ -90,7 +88,7 @@ namespace ta {
 
         double minScore = arg->heap.front().data;
 
-        for (row_type i = 0; i < numCandidatesToVerify; i++) {
+        for (row_type i = 0; i < numCandidatesToVerify; ++i) {
             row_type row = arg->candidatesToVerify[i];
 
             if (arg->probeMatrix->getVectorLength(row) <= minScore)
@@ -102,7 +100,7 @@ namespace ta {
             if (ip > minScore) {
                 std::pop_heap(arg->heap.begin(), arg->heap.end(), std::greater<QueueElement>());
                 arg->heap.pop_back();
-                arg->heap.push_back(QueueElement(ip, arg->probeMatrix->getId(row)));
+                arg->heap.emplace_back(ip, arg->probeMatrix->getId(row));
                 std::push_heap(arg->heap.begin(), arg->heap.end(), std::greater<QueueElement>());
                 minScore = arg->heap.front().data;
             }
@@ -117,17 +115,15 @@ namespace ta {
         arg->comparisons++;
 
         std::pair<bool, double> p;
-        //row_type itemId = matrix.getId(posMatrix);
         p = arg->probeMatrix->passesThreshold(posMatrix, query, arg->theta);
 
         if (p.first) {
-            arg->results.push_back(MatItem(p.second, arg->queryId, arg->probeMatrix->getId(posMatrix)));
+             arg->results.emplace_back(p.second, arg->queryId, arg->probeMatrix->getId(posMatrix));
         }
     }
 
     inline void verifyCandidateTopk(row_type posMatrix, const double* query, RetrievalArguments* arg) {
         std::pair<bool, double> p;
-        //row_type itemId = matrix.getId(posMatrix);
         arg->comparisons++;       
         p = arg->probeMatrix->passesThreshold(posMatrix, query, arg->heap.front().data);
 
@@ -136,7 +132,7 @@ namespace ta {
             pop_heap(arg->heap.begin(), arg->heap.end(), std::greater<QueueElement>()); // Yes! I need to use greater to get a min heap!
             arg->heap.pop_back();
             // and push new element inside the heap
-            arg->heap.push_back(QueueElement(p.second,  arg->probeMatrix->getId(posMatrix)));
+            arg->heap.emplace_back(p.second,  arg->probeMatrix->getId(posMatrix));
             push_heap(arg->heap.begin(), arg->heap.end(), std::greater<QueueElement>());
 
         }

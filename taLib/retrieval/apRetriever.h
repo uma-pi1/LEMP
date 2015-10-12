@@ -31,8 +31,6 @@ namespace ta {
 
 
             double queryLength = query[-1];
-            double invLarge, invSmall;
-
             ssize_t i, j, p, r, sz, cid;
             val_t rwgt;
             double cval, simT, simTe, ip;
@@ -60,7 +58,7 @@ namespace ta {
             sz = nnzQuery;
 #endif
 
-            for (i = 0; i < numCandidates; i++) {
+            for (i = 0; i < numCandidates; ++i) {
 
                 cid = arg->candidatesToVerify[i];
 
@@ -146,7 +144,8 @@ check: // check similarity value
                     if (arg->k == 0) {
 
                         if (ip >= arg->theta) { //simT                              
-                            arg->results.push_back(MatItem(ip, arg->queryId, arg->probeMatrix->getId(posInProbeMatrix)));
+//                            arg->results.push_back(MatItem(ip, arg->queryId, arg->probeMatrix->getId(posInProbeMatrix)));
+                            arg->results.emplace_back(ip, arg->queryId, arg->probeMatrix->getId(posInProbeMatrix));
                         }
                     }
                 }
@@ -194,7 +193,7 @@ nexcid:
             sz = nnzQuery;
 #endif
 
-            for (i = 0; i < numCandidates; i++) {
+            for (i = 0; i < numCandidates; ++i) {
 
                 cid = arg->candidatesToVerify[i];
 
@@ -280,7 +279,8 @@ check: // check similarity value
 
                         std::pop_heap(arg->heap.begin(), arg->heap.end(), std::greater<QueueElement>());
                         arg->heap.pop_back();
-                        arg->heap.push_back(QueueElement(ip, arg->probeMatrix->getId(posInProbeMatrix)));
+//                        arg->heap.push_back(QueueElement(ip, arg->probeMatrix->getId(posInProbeMatrix)));
+                        arg->heap.emplace_back(ip, arg->probeMatrix->getId(posInProbeMatrix));
                         std::push_heap(arg->heap.begin(), arg->heap.end(), std::greater<QueueElement>());
                         minScore = arg->heap.front().data;
 
@@ -399,7 +399,7 @@ nexcid:
 
                 arg->hashlen[i] = bsq;
 
-                for (j = starts[i]; j < ends[i]; j++) {
+                for (j = starts[i]; j < ends[i]; ++j) {
 
 
                     cid = idxids[j]; // potential candidate from the inv index
@@ -450,8 +450,6 @@ nexcid:
 
         void l2apFindMatchesTopk(const double * query, row_type nnzQuery, double maxQueryCoord,
                 L2apIndex* index, ProbeBucket& probeBucket, RetrievalArguments* arg) {
-
-            double queryLength = query[-1];
 
             double localTheta;
 
@@ -550,7 +548,7 @@ nexcid:
 
                 arg->hashlen[i] = bsq;
 
-                for (j = starts[i]; j < ends[i]; j++) {
+                for (j = starts[i]; j < ends[i]; ++j) {
 
 
                     cid = idxids[j]; // potential candidate from the inv index
@@ -604,11 +602,9 @@ nexcid:
 
     public:
 
-        apRetriever() : Retriever(LEMP_AP) {
-        }
+        apRetriever() = default;
 
-        ~apRetriever() {
-        }
+        ~apRetriever() = default;
 
         inline virtual void run(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) {
             std::cerr << "Error! You shouldn't have called that" << std::endl;
@@ -644,13 +640,11 @@ nexcid:
             L2apIndex* index = static_cast<L2apIndex*> (probeBucket.getIndex(AP));
 
 
+            for(auto& queryBatch: arg->queryBatches){
 
-            for (row_type q = 0; q < arg->queryBatches.size(); q++) {
-
-                if (arg->queryBatches[q].inactiveCounter == arg->queryBatches[q].rowNum)
+                if (queryBatch.inactiveCounter == queryBatch.rowNum)
                     continue;
 
-                QueryBucket_withTuning& queryBatch = arg->queryBatches[q];
 
                 if (!index->initialized) {
 #if defined(TIME_IT)
@@ -681,11 +675,6 @@ nexcid:
 
                     double minScore = arg->topkResults[i].data;
 
-                    //                    arg->moveTopkToHeap(i);
-
-                    // get the minScore
-                    //                    double minScore = arg->heap.front().data;
-
                     if (probeBucket.normL2.second < minScore) {// skip this bucket and all other buckets
                         queryBatch.inactiveQueries[user - queryBatch.startPos] = true;
                         queryBatch.inactiveCounter++;
@@ -708,12 +697,8 @@ nexcid:
                     }
 
                     arg->writeHeapToTopk(user);
-
                     user++;
                 }
-
-
-
             }
 
         }
@@ -722,21 +707,13 @@ nexcid:
 
             L2apIndex* index = static_cast<L2apIndex*> (probeBucket.getIndex(AP));
 
-            for (row_type q = 0; q < arg->queryBatches.size(); q++) {
+               for(auto& queryBatch: arg->queryBatches){
 
-                if (arg->queryBatches[q].normL2.second < probeBucket.bucketScanThreshold) {
+                if (queryBatch.normL2.second < probeBucket.bucketScanThreshold) {
                     break;
                 }
 
-
-                QueryBucket_withTuning& queryBatch = arg->queryBatches[q];
-
-
-
-
-                for (row_type i = queryBatch.startPos; i < queryBatch.endPos; i++) {
-
-
+                for (row_type i = queryBatch.startPos; i < queryBatch.endPos; ++i) {
                     const double* query = arg->queryMatrix->getMatrixRowPtr(i);
 
                     if (query[-1] < probeBucket.bucketScanThreshold)// skip all users from this point on for this bucket
@@ -748,9 +725,6 @@ nexcid:
                     l2apFindMatches(query, nnzQuery, maxQueryCoord, index, probeBucket, arg);
 
                 }
-
-
-
             }
 
         }

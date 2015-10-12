@@ -35,8 +35,8 @@ namespace ta {
         double x[2]; //x[0]: sum pi*qi x[1]: sum pi^2        
 #endif
 
-        inline Candidate_incr() {
-        }
+        inline Candidate_incr() = default;
+        inline ~Candidate_incr() = default;
 
         inline void addFirst(double qi, double pi) {
 

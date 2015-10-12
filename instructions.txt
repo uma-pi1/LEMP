@@ -10,7 +10,8 @@ LEMP adapts many existing techniques (Trees, L2AP) for the problem of large-entr
 The code regarding these methods is to a big extend copied from publicly available code provided by the authors of these methods (the original licences are included).
 
 
-1. DEPENDENCIES
+1. REQUIREMENTS
+LEMP is using C++11. gcc 4.7 or higher is needed.
 
 1.1. For LEMP-Tree: 
 
@@ -57,6 +58,9 @@ a31
 a12
 a22
 a32
+
+Alternatively, LEMP can accept .csv files (comma separated values). Each line corresponds to a vector and the coordinate values are separated with commas. In this case, the user should additionally provide the dimensions of the datasets m, r, n.
+
  
 The datasets used in the paper "LEMP: Fast Retrieval of Large Entries in a Matrix Product" can be found at http://dws.informatik.uni-mannheim.de/en/resources/software/lemp/
 
@@ -82,6 +86,10 @@ Options:
   --resultsFile arg              output File (contains the results)
   --cacheSizeinKB arg (=8192)    cache size in KB
   --t arg (=1)                   num of threads (default 1)
+  --r arg (=0)                   num of coordinates in each vector (needed when reading from csv files)
+  --m arg (=0)                   num of vectors in Q^T (needed when reading from csv files)
+  --n arg (=0)                   num of vectors in P (needed when reading from csv files)
+
 
 
 
@@ -165,7 +173,9 @@ Options:
                            
   --logFile arg            output File (contains runtime information)
   --resultsFile arg        output File (contains the results)
-
+  --r arg (=0)             num of coordinates in each vector (needed when reading from csv files)
+  --m arg (=0)             num of vectors in Q^T (needed when reading from csv files)
+  --n arg (=0)             num of vectors in P (needed when reading from csv files)
   
   
 Similarly you can use the executable   runTA_all to use a simple Threshold Algorithm with Random Accesses to find the large inner products. Here are the parameters:
@@ -181,10 +191,45 @@ Options:
   --isTARR arg (=1)        If 1 Round Robin schedule is used(default). Otherwise Max PiQi
   --logFile arg            output File (contains runtime information)
   --resultsFile arg        output File (contains the results)
+  --r arg (=0)             num of coordinates in each vector (needed when reading from csv files)
+  --m arg (=0)             num of vectors in Q^T (needed when reading from csv files)
+  --n arg (=0)             num of vectors in P (needed when reading from csv files)
+  
+  
+We also include the PCA-tree  (runPCATree) and SimpleLSH (runSimpleLSH)  method. However for these methods we do not include the transformation. In other words, the input file should contain the already transformed vectors. 
+In addition, the implementation of these methods includes only the Row-Top-k problem.
+Here are the parameters for the PCA-Tree:
 
-  
-  
-  
+  --help                   produce help message
+  --Q^T arg                file containing the query matrix (left side)
+  --P arg                  file containing the probe matrix (right side)
+  --k arg (=5)             top k (default=5)
+  --querySideLeft arg (=1) 1 if Q^T contains the queries (default). Interesting
+                           for Row-Top-k
+  --logFile arg            output File (contains runtime information)
+  --resultsFile arg        output File (contains the results)
+  --d arg (=0)             depth of the tree (default=0)
+  --r arg (=0)             num of coordinates in each vector (needed when reading from csv files)
+  --m arg (=0)             num of vectors in Q^T (needed when reading from csv files)
+  --n arg (=0)             num of vectors in P (needed when reading from csv files)
+
+runSimpleLSH  in reality runs cosine similarity search on the input vectors. To use it, set the parameters LSH_SIGNATURES and LSH_CODE_LENGTH in taLib/structs/Definitions.h to the desired values and recompile.
+
+Options:
+  --help                            produce help message
+  --Q^T arg                         file containing the query matrix (left 
+                                    side)
+  --P arg                           file containing the probe matrix (right 
+                                    side)
+  --querySideLeft arg (=1)          1 if Q^T contains the queries (default). 
+                                    Interesting for Row-Top-k
+  --k arg                           top k 
+  --logFile arg                     output File (contains runtime information)
+  --resultsFile arg                 output File (contains the results)
+  --r arg (=0)                      num of coordinates in each vector (needed when reading from csv files)
+  --m arg (=0)                      num of vectors in Q^T (needed when reading from csv files)
+  --n arg (=0)                      num of vectors in P (needed when reading from csv files)
+
 
 
 Did you find any bugs? Do you have questions? Feel free to contact us: chteflio@mpi-inf.mpg.de

@@ -82,13 +82,10 @@ namespace ta {
 
 
     public:
-        double t_b_LSH;
 
-        LshRetriever() : Retriever(LEMP_LSH), t_b_LSH(1) {
-        }
+        LshRetriever() = default;
 
-        ~LshRetriever() {
-        }
+        ~LshRetriever() = default;
 
         inline virtual void run(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) {
         }
@@ -137,17 +134,6 @@ namespace ta {
                 double avgBlockTime = 0;
                 double min_t_b = -1;
                 int breakpoint = xValues->size() - 1;
-
-                //                retrArg[0].tunerTimer.start();
-                //                index->checkAndReallocateAll(retrArg[0].probeMatrix, true, probeBucket.startPos, probeBucket.endPos, LSH_SIGNATURES,
-                //                        retrArg[0].sums, retrArg[0].countsOfBlockValues, retrArg[0].sketches, retrArg[0].rig);
-                //                
-                //                
-                //                retrArg[0].tunerTimer.stop();
-                //                double blockOverhead = retrArg[0].tunerTimer.elapsedTime().nanos() / (LSH_SIGNATURES * probeBucket.activeQueries);
-                //                double extraOverhead;
-
-           
 
                 for (int i = xValues->size() - 1; i >= 0; i--) {
                     int t = xValues->at(i).i;
@@ -216,12 +202,13 @@ namespace ta {
 
             if (xValues->size() > 0) {
                 plain.xValues = xValues;
+                plain.sampleTimes.reserve(xValues->size());
 
-                for (row_type i = 0; i < xValues->size(); i++) {
+                for (row_type i = 0; i < xValues->size(); ++i) {
                     int t = xValues->at(i).i;
                     int ind = xValues->at(i).j;
 
-                    plain.sampleTimes.push_back(retrArg[0].globalData[b][t][ind].lengthTime);
+                    plain.sampleTimes.emplace_back(retrArg[0].globalData[b][t][ind].lengthTime);
                     plain.sampleTotalTime += retrArg[0].globalData[b][t][ind].lengthTime;
                 }
 
@@ -262,7 +249,8 @@ namespace ta {
                     std::vector<QueueElement>& prevResults = retrArg[0].globalData[b - 1][t][ind].results; //just reading
 
 
-                    retrArg[0].heap.assign(prevResults.begin(), prevResults.end());
+//                    retrArg[0].heap.assign(prevResults.begin(), prevResults.end());
+                    std::copy(prevResults.begin(), prevResults.end(), retrArg[0].heap.begin());
                     std::make_heap(retrArg[0].heap.begin(), retrArg[0].heap.end(), std::greater<QueueElement>());
 
                     double minScore = retrArg[0].heap.front().data;
@@ -343,12 +331,11 @@ namespace ta {
 #endif
                 }
 
-                for (row_type q = 0; q < arg->queryBatches.size(); q++) {
+                for(auto& queryBatch: arg->queryBatches){
 
-                    if (arg->queryBatches[q].inactiveCounter == arg->queryBatches[q].rowNum)
+                    if (queryBatch.inactiveCounter == queryBatch.rowNum)
                         continue;
 
-                    QueryBucket_withTuning& queryBatch = arg->queryBatches[q];
 #ifdef TIME_IT
                     arg->t.start();
 #endif 
@@ -451,14 +438,11 @@ namespace ta {
 
             LshIndex* index = static_cast<LshIndex*> (probeBucket.getIndex(LSH));
 
-            for (row_type q = 0; q < arg->queryBatches.size(); q++) {
+            for(auto& queryBatch: arg->queryBatches){
 
-                if (arg->queryBatches[q].normL2.second < probeBucket.bucketScanThreshold) {
+                if (queryBatch.normL2.second < probeBucket.bucketScanThreshold) {
                     break;
                 }
-
-                QueryBucket_withTuning& queryBatch = arg->queryBatches[q];
-
 
                 if (probeBucket.t_b == 1 || (probeBucket.t_b * queryBatch.normL2.first > probeBucket.bucketScanThreshold)) {
                     plain.run(queryBatch, probeBucket, arg);
@@ -482,7 +466,7 @@ namespace ta {
 
                     LshIndex* queryIndex = queryBatch.lshIndex;
 
-                    for (row_type i = queryBatch.startPos; i < queryBatch.endPos; i++) {
+                    for (row_type i = queryBatch.startPos; i < queryBatch.endPos; ++i) {
 
                         const double* query = arg->queryMatrix->getMatrixRowPtr(i);
 

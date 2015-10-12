@@ -52,15 +52,16 @@ namespace ta {
         ta_size_type i;
         ta_size_type j;
 
-        MatItem(){}
-        MatItem(double result, ta_size_type i, ta_size_type j) : result(result), i(i), j(j) {
+        inline ~MatItem() = default;
+        inline MatItem() = default;
+        inline MatItem(double result, ta_size_type i, ta_size_type j) : result(result), i(i), j(j) {
         };
 
-        bool operator==(const MatItem & other) const {
+        inline bool operator==(const MatItem & other) const {
             return i == other.i && j == other.j;
         }
 
-        bool equals(const MatItem & other)const {
+        inline bool equals(const MatItem & other)const {
             return result == other.result && i == other.i && j == other.j;
         }
 
@@ -68,7 +69,7 @@ namespace ta {
             return !operator==(other);
         }
 
-        bool operator<(const MatItem & other) const {
+        inline bool operator<(const MatItem & other) const {
             if (result < other.result) {
                 return true;
             } else if (result == other.result) {
@@ -87,7 +88,7 @@ namespace ta {
             return operator<(other) || operator==(other);
         }
 
-        bool operator>(const MatItem & other) const {
+        inline bool operator>(const MatItem & other) const {
             return !operator<=(other);
         }
 
@@ -103,19 +104,17 @@ namespace ta {
     }
 
     struct QueueElement {
-        double data;
-        ta_size_type id;
+        double data = 0.0;
+        ta_size_type id = 0;
 
         inline QueueElement(double data, ta_size_type id) : data(data), id(id) {
         };
 
-        inline QueueElement() : data(0.0), id(0) {
-        };
+        inline QueueElement() = default;
 
-        inline ~QueueElement() {
-        };
+        inline ~QueueElement() = default;
 
-        bool operator==(const QueueElement & other) const {
+        inline bool operator==(const QueueElement & other) const {
             if (this == &other)
                 return true;
             return data == other.data && id == other.id;
@@ -197,38 +196,25 @@ namespace ta {
             ta_size_type r = right(i);
             ta_size_type largest;
 
-            //heapifies++;
-
             if (l < size && heap[l] > heap[i]) {
                 largest = l;
-                //__builtin_prefetch(&heap[((largest + 1) << 1) - 1], 1, 0);
             } else {
                 largest = i;
             }
-
-
             if (r < size && heap[r] > heap[largest]) {
                 largest = r;
-                //__builtin_prefetch(&heap[((largest + 1) << 1)], 1, 0);
             }
-
-
             if (largest != i) {
                 exchange(i, largest);
                 heapify(largest);
-            } else {
-                //std::cout<<"heap[l]: "<<heap[l]<<" heap[r]: "<<heap[r]<<std::endl;
-            }
+            } 
         }
 
     public:
 
-        maxHeap() {
-            //heapifies = 0;
-        };
+        maxHeap() = default;
 
-        ~maxHeap() {
-        };
+        ~maxHeap() = default;
 
         inline QueueElement* getRoot() {
             return &heap[0];
@@ -253,7 +239,7 @@ namespace ta {
 
         /** Inserts key into the heap, and then upheaps that key to a
          * position where the heap property is satisfied. */
-        inline bool add(QueueElement key) {
+        inline bool add(QueueElement key) { //QueueElement&& ?
             size = heap.size();
             ta_size_type i = size;
             heap.resize(size + 1);

@@ -18,7 +18,7 @@
 namespace ta {
 
     struct RandomIntGaussians {
-//         gsl_rng *r;
+        //         gsl_rng *r;
 
         boost::mt19937 rng; // I don't seed it on purpouse (it's not relevant)
 
@@ -33,7 +33,8 @@ namespace ta {
         int nDimensions;
         int nHashes;
 
-        inline RandomIntGaussians(int dimensions, int numHashes) : nDimensions(dimensions), nHashes(numHashes), range(16) {//[-8,8]       
+        inline RandomIntGaussians(int dimensions, int numHashes) : nDimensions(dimensions), nHashes(numHashes), range(16), //[-8,8]
+        intGaussians(nullptr), intToFloatCache(nullptr) {
             assert(numHashes % 8 == 0);
 
             leftLimit = (0 - range) / 2.0;
@@ -44,23 +45,21 @@ namespace ta {
             long s = nHashes * nDimensions; //maxHashes            
             intGaussians = new uint16_t[s];
 
-//            r = gsl_rng_alloc(gsl_rng_taus2);
-//            gsl_rng_set(r, 123); // very much not-random ///////////////////////////////
+            //            r = gsl_rng_alloc(gsl_rng_taus2);
+            //            gsl_rng_set(r, 123); // very much not-random ///////////////////////////////
 
 
-	    rng.seed(123);
+            rng.seed(123);
 
 
 
             int cacheSize = 65536;
             intToFloatCache = new float[cacheSize];
 
-            intToFloatCache[0] = leftLimit;
-            for (int i = 1; i < cacheSize; i++) {
+            intToFloatCache[0] = leftLimit;    
+            for (int i = 1; i < cacheSize; ++i) {
                 intToFloatCache[i] = intToFloatCache[i - 1] + intToFloatFactor;
             }
-
-
 
             fill();
         }
@@ -71,16 +70,16 @@ namespace ta {
             boost::normal_distribution<> nd(0.0, 1.0);
             boost::variate_generator<boost::mt19937&, boost::normal_distribution<> > var_normal(rng, nd);
 
-            for (int b = 0; b < nHashes; b++) {
+            for (int b = 0; b < nHashes; ++b) {
 
-                for (int d = 0; d < nDimensions; d++) {
+                for (int d = 0; d < nDimensions; ++d) {
                     long long k = d * nHashes + b;
 
-//                    rf = (float) gsl_ran_gaussian_ziggurat(r, 1.0);
-                    
+                    //                    rf = (float) gsl_ran_gaussian_ziggurat(r, 1.0);
+
                     rf = (float) var_normal();
-                   
-                    
+
+
                     if (rf < leftLimit) {
                         intGaussians[k] = (uint16_t) 0;
                         continue;
@@ -93,7 +92,7 @@ namespace ta {
 
                 }
             }
-            
+
         }
 
         inline float intToFloat(uint16_t a) {
@@ -105,9 +104,11 @@ namespace ta {
         }
 
         ~RandomIntGaussians() {
-            delete[] intGaussians;
-//             gsl_rng_free(r);
-            delete[] intToFloatCache;
+            if (intGaussians != nullptr)
+                delete[] intGaussians;
+            //             gsl_rng_free(r);
+            if (intToFloatCache != nullptr)
+                delete[] intToFloatCache;
         }
 
     };

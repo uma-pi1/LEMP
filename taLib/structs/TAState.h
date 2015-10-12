@@ -39,7 +39,7 @@ namespace ta {
         bool allSeen; // true if you should stop scanning
 
 
-        TAState(col_type colNum) : colNum(colNum), invLists(0) {
+        TAState(col_type colNum) : colNum(colNum), invLists(nullptr) {
             fringePos.resize(colNum);
         }
 
@@ -100,7 +100,7 @@ namespace ta {
         inline double initializeThreshold() {
             double stopThreshold = 0;
 
-            for (col_type i = 0; i < colNum; i++) {
+            for (col_type i = 0; i < colNum; ++i) {
                 stopThreshold += invLists->getElement(fringePos[i])->data * query[i];
             }
 
@@ -144,7 +144,7 @@ namespace ta {
             TAState::initForNewQuery(q);
             piqi.clear();
 
-            for (col_type i = 0; i < colNum; i++) {
+            for (col_type i = 0; i < colNum; ++i) {
                 if (query[i] < 0) { //scan downwards///////////////////////
                     fringePos[i] = i * invLists->size + 0;
                 } else {
@@ -190,7 +190,7 @@ namespace ta {
             colIndx = 0;            
             activeCols.clear();
 
-            for (col_type i = 0; i < colNum; i++) {
+            for (col_type i = 0; i < colNum; ++i) {
                 if (query[i] < 0) { //scan downwards///////////////////////
                     fringePos[i] = i * invLists->size + 0;
                 } else {

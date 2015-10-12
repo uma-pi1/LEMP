@@ -48,7 +48,6 @@ namespace ta {
         }
 
         inline ~TreeIndex() {
-
             if (!tree) {
                 delete tree;
             }

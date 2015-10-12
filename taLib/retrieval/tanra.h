@@ -26,14 +26,9 @@ namespace ta {
     class tanraRetriever : public Retriever {
     public:
 
-        //double bestTimeLTA;
-        row_type t_b_indx;
+        tanraRetriever() = default;
 
-        tanraRetriever() : Retriever(LEMP_TA) {
-        };
-
-        ~tanraRetriever() {
-        };
+        ~tanraRetriever() = default;
 
         //lists is dummy
 

@@ -39,7 +39,7 @@ int main(int argc, char *argv[]) {
 
     bool querySideLeft = true;
     bool isTARR = true;
-    int k, cacheSizeinKB, threads;
+    int k, cacheSizeinKB, threads, r, m, n;
     std::string methodStr;
     LEMP_Method method;
 
@@ -60,6 +60,9 @@ int main(int argc, char *argv[]) {
 	    ("resultsFile", value<string>(&resultsFile)->default_value(""), "output File (contains the results)")
             ("cacheSizeinKB", value<int>(&cacheSizeinKB)->default_value(8192), "cache size in KB")
             ("t", value<int>(&threads)->default_value(1), "num of threads (default 1)")
+            ("r", value<int>(&r)->default_value(0), "num of coordinates in each vector (needed when reading from csv files)")
+            ("m", value<int>(&m)->default_value(0), "num of vectors in Q^T (needed when reading from csv files)")
+            ("n", value<int>(&n)->default_value(0), "num of vectors in P (needed when reading from csv files)")
             ;
 
 
@@ -93,6 +96,9 @@ int main(int argc, char *argv[]) {
     args.R = R;
     args.epsilon = epsilon;
     args.isTARR = isTARR;
+    args.r = r;
+    args.m = m;
+    args.n = n;
     
    
 

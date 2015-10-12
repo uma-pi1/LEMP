@@ -40,16 +40,13 @@ namespace ta {
 
         // calculate how large the sample should be
         row_type sampleSize = 0;
-        for (int t = 0; t < retrArg.size(); t++) {
-            sampleSize += retrArg[t].queryMatrix->rowNum;
+        for (auto& arg : retrArg) {
+            sampleSize += arg.queryMatrix->rowNum;
         }
-
         sampleSize *= 0.02;
-
         if (sampleSize > UPPER_LIMIT_PER_BUCKET) {
             sampleSize = UPPER_LIMIT_PER_BUCKET;
         }
-
         sampleSize /= retrArg.size();
 
         rg::Random32& random = retrArg[0].random;
@@ -60,14 +57,13 @@ namespace ta {
 
 
         // from the query matrix that corresponds to each thread...
-        for (int t = 0; t < retrArg.size(); t++) {
+        for (int t = 0; t < retrArg.size(); ++t) {
 
             //... get a sample
             std::vector<row_type> sampleIndx = rg::sample(random, sampleSize, retrArg[t].queryMatrix->rowNum);
 
 
-            for (int i = 0; i < sampleSize; i++) {// for each sample query
-                id = sampleIndx[i];
+            for (auto id : sampleIndx) {
 
                 const double* query = retrArg[t].queryMatrix->getMatrixRowPtr(id);
 
@@ -77,15 +73,15 @@ namespace ta {
                 retrArg[0].globalData[0][t][id] = GlobalTopkTuneData();
 
 
-                for (row_type j = probeBuckets[0].startPos; j < probeBuckets[0].endPos; j++) {
+                for (row_type j = probeBuckets[0].startPos; j < probeBuckets[0].endPos; ++j) {
                     double ip = retrArg[0].probeMatrix->innerProduct(j, query);
-                    retrArg[0].globalData[0][t][id].results.push_back(QueueElement(ip, retrArg[0].probeMatrix->getId(j)));
+                    retrArg[0].globalData[0][t][id].results.emplace_back(ip, retrArg[0].probeMatrix->getId(j));
                 }
 
                 // and now make the heap
                 std::make_heap(retrArg[0].globalData[0][t][id].results.begin(), retrArg[0].globalData[0][t][id].results.end(), std::greater<QueueElement>()); // non thread safe
 
-                for (row_type b = 1; b < probeBuckets.size(); b++) {
+                for (row_type b = 1; b < probeBuckets.size(); ++b) {
 
                     std::vector<QueueElement>& prevResults = retrArg[0].globalData[b - 1][t][id].results;
 
@@ -100,7 +96,7 @@ namespace ta {
 
                         retrArg[0].globalData[b][t][id] = GlobalTopkTuneData();
 
-                        retrArg[0].heap.assign(prevResults.begin(), prevResults.end());
+                        std::copy(prevResults.begin(), prevResults.end(), retrArg[0].heap.begin());
                         std::make_heap(retrArg[0].heap.begin(), retrArg[0].heap.end(), std::greater<QueueElement>());
 
                         retrArg[0].tunerTimer.start();
@@ -108,7 +104,8 @@ namespace ta {
                         retrArg[0].tunerTimer.stop();
                         retrArg[0].globalData[b][t][id].lengthTime = retrArg[0].tunerTimer.elapsedTime().nanos();
 
-                        retrArg[0].globalData[b][t][id].results.assign(retrArg[0].heap.begin(), retrArg[0].heap.end());
+                        retrArg[0].globalData[b][t][id].results.reserve(retrArg[0].k);
+                        std::copy_n(retrArg[0].heap.begin(), retrArg[0].k, std::back_inserter(retrArg[0].globalData[b][t][id].results));
 
                         if (b > bucketsForInit)
                             bucketsForInit = b;
@@ -119,11 +116,13 @@ namespace ta {
 
 
 
-        for (row_type b = 1; b < probeBuckets.size(); b++) {
+        for (row_type b = 1; b < probeBuckets.size(); ++b) {
             row_type counter = 0;
-            for (int t = 0; t < retrArg.size(); t++) {
+
+            for (int t = 0; t < retrArg.size(); ++t) {
                 counter += retrArg[0].globalData[b][t].size();
             }
+
             if (counter >= LOWER_LIMIT_PER_BUCKET) {
                 activeBuckets++;
             } else { // if I do not have enough sample queries for a bucket, it makes no sense to try  to tune
@@ -136,14 +135,14 @@ namespace ta {
 
 
         p.first = activeBuckets; // I will try to tune t_b, phi for all these buckets
-        p.second = bucketsForInit;// I will create indexes for all these buckets (in multi-threaded it is better to create indexes before you enter the retrieval phase)
+        p.second = bucketsForInit; // I will create indexes for all these buckets (in multi-threaded it is better to create indexes before you enter the retrieval phase)
 
 
         return p;
     }
 
-   
-    
+
+
 }
 
 

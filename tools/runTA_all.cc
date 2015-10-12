@@ -31,69 +31,68 @@ using namespace std;
 using namespace ta;
 using namespace boost::program_options;
 
-
-
-
-
 int main(int argc, char *argv[]) {
-	double theta;
-	string leftMatrix;
-	string rightMatrix;
-	string logFile, resultsFile;
+    double theta;
+    string leftMatrix;
+    string rightMatrix;
+    string logFile, resultsFile;
 
-	bool querySideLeft = true;
-        bool isTARR = true;
-	int k;
+    bool querySideLeft = true;
+    bool isTARR = true;
+    int k, r, m, n;
 
-	// read command line
-	options_description desc("Options");
-	desc.add_options()
-				("help", "produce help message")
-				("Q^T", value<string>(&leftMatrix), "file containing Q^T")
-				("P", value<string>(&rightMatrix), "file containing the P")
-				("theta", value<double>(&theta), "theta value")
-				("k", value<int>(&k)->default_value(0), "top k (default 0). If 0 Above-theta will run")
-				("querySideLeft", value<bool>(&querySideLeft)->default_value(true), "1 if Q^T contains the queries (default). Interesting for Row-Top-k")	   
-                                ("isTARR", value<bool>(&isTARR)->default_value(true), "If 1 Round Robin schedule is used (default). Otherwise Max PiQi")			
-                                ("logFile", value<string>(&logFile)->default_value(""), "output File (contains runtime information)")
-				("resultsFile", value<string>(&resultsFile)->default_value(""), "output File (contains the results)")
-                               
-				
-	;
+    // read command line
+    options_description desc("Options");
+    desc.add_options()
+            ("help", "produce help message")
+            ("Q^T", value<string>(&leftMatrix), "file containing Q^T")
+            ("P", value<string>(&rightMatrix), "file containing the P")
+            ("theta", value<double>(&theta), "theta value")
+            ("k", value<int>(&k)->default_value(0), "top k (default 0). If 0 Above-theta will run")
+            ("querySideLeft", value<bool>(&querySideLeft)->default_value(true), "1 if Q^T contains the queries (default). Interesting for Row-Top-k")
+            ("isTARR", value<bool>(&isTARR)->default_value(true), "If 1 Round Robin schedule is used (default). Otherwise Max PiQi")
+            ("logFile", value<string>(&logFile)->default_value(""), "output File (contains runtime information)")
+            ("resultsFile", value<string>(&resultsFile)->default_value(""), "output File (contains the results)")
+            ("r", value<int>(&r)->default_value(0), "num of coordinates in each vector (needed when reading from csv files)")
+            ("m", value<int>(&m)->default_value(0), "num of vectors in Q^T (needed when reading from csv files)")
+            ("n", value<int>(&n)->default_value(0), "num of vectors in P (needed when reading from csv files)")
+            ;
 
-	positional_options_description pdesc;
-	pdesc.add("Q^T", 1);
-	pdesc.add("P", 2);
+    positional_options_description pdesc;
+    pdesc.add("Q^T", 1);
+    pdesc.add("P", 2);
 
-	variables_map vm;
-	store(command_line_parser(argc, argv).options(desc).positional(pdesc).run(), vm);
-	notify(vm);
+    variables_map vm;
+    store(command_line_parser(argc, argv).options(desc).positional(pdesc).run(), vm);
+    notify(vm);
 
-	if (vm.count("help") || vm.count("Q^T")==0 || vm.count("P")==0) {
-		cout << "run TA all [options] <Q^T> <P>" << endl << endl;
-		cout << desc << endl;
-		return 1;
-	}
-	LEMPArg args;
-	args.theta = theta;
-	args.usersFile = leftMatrix;
-	args.itemsFile = rightMatrix;
-	args.logFile = logFile;
-	args.resultsFile = resultsFile;
-	args.k = k;
-	args.querySideLeft = querySideLeft;
-        args.method = LEMP_TA;
-        args.isTARR = isTARR;
+    if (vm.count("help") || vm.count("Q^T") == 0 || vm.count("P") == 0) {
+        cout << "run TA all [options] <Q^T> <P>" << endl << endl;
+        cout << desc << endl;
+        return 1;
+    }
+    LEMPArg args;
+    args.theta = theta;
+    args.usersFile = leftMatrix;
+    args.itemsFile = rightMatrix;
+    args.logFile = logFile;
+    args.resultsFile = resultsFile;
+    args.k = k;
+    args.querySideLeft = querySideLeft;
+    args.method = LEMP_TA;
+    args.isTARR = isTARR;
+    args.r = r;
+    args.m = m;
+    args.n = n;
 
+    ta::TA_all algo(args);
 
-	ta::TA_all algo(args);
+    if (args.k > 0) {
+        algo.runTopkPerUser();
+    } else {
+        algo.multiply();
+    }
 
-	if(args.k > 0){
-		algo.runTopkPerUser();
-	}else{
-		algo.multiply();
-	}
-
-	return 0;
+    return 0;
 }
 

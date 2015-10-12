@@ -39,14 +39,14 @@ namespace ta {
         std::vector<row_type> initializedSketches;
         row_type initializedSketchesForIndex;
 
-        inline LshIndex() : initializedSketchesForIndex(0), cosSketches(0), lshBins(0) {
+        inline LshIndex() : initializedSketchesForIndex(0), cosSketches(nullptr), lshBins(nullptr) {
         }
 
         inline ~LshIndex() {
-            if (cosSketches)
+            if (cosSketches != nullptr)
                 delete cosSketches;
 
-            if (lshBins)
+            if (lshBins != nullptr)
                 delete lshBins;
 
         }
@@ -68,34 +68,6 @@ namespace ta {
                 if (forProbe) {
                     lshBins->populateBins(ptrSketches, startBlock, endBlock, countsOfBlockValues);
                 }
-                initializedSketchesForIndex = endBlock;
-            }
-        }
-
-        inline void checkAndReallocateAll2(VectorMatrix* matrix, bool forProbe, row_type start, row_type end, row_type activeBuckets,
-                std::vector<float>& sums, std::vector<row_type>& countsOfBlockValues, uint8_t* my_sketches, RandomIntGaussians* rig) {
-
-            row_type startBlock = initializedSketchesForIndex;
-            uint8_t* ptrSketches = (forProbe ? my_sketches : cosSketches->sketches);
-
-            if (startBlock < activeBuckets) { // reallocate
-
-                // find end block
-                row_type endBlock = activeBuckets;
-		lshBins->resizeBins(endBlock);
-
-                row_type startOffset = cosSketches->bytesPerCode * startBlock;
-                row_type startHashBit = startBlock * cosSketches->hashCodeLength;
-                row_type endHashBit = endBlock * cosSketches->hashCodeLength;
-		
-
-                for (row_type i = start; i < end; i++) {
-                    // sums must be completely zero at this point.
-                    double* vec = matrix->getMatrixRowPtr(i);
-                    cosSketches->buildSingle2(vec, (i - start), matrix->colNum, sums, rig, ptrSketches, startBlock, endBlock, startHashBit, endHashBit, startOffset);
-		    lshBins->populateBinsSingle(ptrSketches, startBlock, endBlock, countsOfBlockValues, (i - start));
-                }                			
-
                 initializedSketchesForIndex = endBlock;
             }
         }
@@ -140,17 +112,17 @@ namespace ta {
 
                     switch (LSH_CODE_LENGTH) {
                         case 8:
-                            lshBins = new LshBins8();
+                            lshBins = new LshBinsDense();
                             break;
                         case 16:
-                            lshBins = new LshBins16();
+                            lshBins = new LshBinsSparse<uint16_t>();
                             break;
                         case 24:
                         case 32:
-                            lshBins = new LshBins32();
+                            lshBins = new LshBinsSparse<uint32_t>();
                             break;
                         default:
-                            lshBins = new LshBins64();
+                            lshBins = new LshBinsSparse<uint64_t>();
                             break;
                     }
                     

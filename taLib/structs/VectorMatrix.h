@@ -23,7 +23,6 @@
 #define VECTORMATRIX_H_
 
 #include <boost/numeric/ublas/matrix_proxy.hpp>
-#include <taLib/structs/read.cpp>
 #include <fstream>
 #include <iostream>
 #include <cassert>
@@ -35,11 +34,11 @@
 #include <ostream>
 #include <iomanip>
 #include <boost/unordered_map.hpp>
+#include <boost/algorithm/string/predicate.hpp>
 
-
-
+#ifdef  WITH_SIMD
 #include <pmmintrin.h> //SSE3
-
+#endif
 
 
 
@@ -47,12 +46,20 @@ using boost::unordered_map;
 
 namespace ta {
 
+    inline void skipLineFromFile(std::ifstream & file) {
+        char c = 0;
+        while (c != '\n' && !file.eof() && file.good()) {
+            file >> std::noskipws >> c;
+        }
+        file >> std::skipws;
+    }
+
     inline void computeDefaultBlockOffsets(row_type size, row_type blocks, std::vector<row_type>& blockOffsets, row_type start = 0) {
 
         blockOffsets.resize(blocks);
         row_type minSize = size / blocks;
         row_type remainder = size % blocks;
-        for (row_type i = 0; i < blocks; i++) {
+        for (row_type i = 0; i < blocks; ++i) {
             if (i == 0) {
                 blockOffsets[i] = start;
             } else {
@@ -65,8 +72,19 @@ namespace ta {
         }
     };
 
+    inline void scaleAndCopy(double* v1, const double* v2, double scale, col_type colNum) {
+        for (int j = 0; j < colNum; ++j) {
+            v1[j] = v2[j] * scale;
+        }
+    }
 
-    // typedef
+    inline double calculateLength(const double* vec, col_type colNum) {
+        double len = 0;
+        for (int j = 0; j < colNum; ++j) {
+            len += vec[j] * vec[j];
+        }
+        return sqrt(len);
+    }
 
     struct VectorMatrix {
         double* data;
@@ -76,7 +94,7 @@ namespace ta {
         std::vector<double> maxVectorCoord;
         std::vector<row_type> vectorNNZ;
         std::vector<QueueElement> colFrequencies;
-        
+
         row_type colNum, offset, lengthOffset;
         row_type rowNum;
         std::vector<QueueElement> lengthInfo; // data: length id: vectorId
@@ -87,56 +105,30 @@ namespace ta {
         // for simd instruction  
         int sizeDiv2;
 
+    private:
 
-
-
-        inline VectorMatrix() : data(0), shuffled(false), normalized(false), lengthOffset(1){////////////////////// 1 is for padding
+        inline void zeroOutLastPadding() {
+            for (row_type i = 0; i < rowNum; ++i) {
+                data[(i + 1) * offset - 3] = 0; // zero-out the last padding
+            }
         }
 
-        inline ~VectorMatrix() {        
-            free(data);
-        }
 
-        inline void readFromFile(std::string& fileName, bool left = true) {
-            std::ifstream file(fileName.c_str(), std::ios_base::in);
-            while (file.peek() == '%') {
-                skipLineFromFile(file);
+
+        // stuff that needs to be done in both read methods
+        // rowNum and colNum need to be initialized before calling this method
+
+        inline void readFromFileCommon() {
+            if (pow(2, sizeof (col_type) * 8) - 1 < colNum) {
+                std::cerr << "Your vectors have dimensionality " << colNum << " which is more than what lemp is compiled to store. Change the col_type in BasicStructs.h and recompile." << std::endl;
+                exit(1);
+            }
+            if (pow(2, sizeof (row_type) * 8) - 1 < rowNum) {
+                std::cerr << "Your dataset has " << rowNum << " vectors which is more than what lemp is compiled to store. Change the row_type in BasicStructs.h and recompile." << std::endl;
+                exit(1);
             }
 
-            ta_size_type col; // columns
-            ta_size_type row; // rows
-            file >> row >> col;
-
-
-            std::cout << "Reading file: " << fileName << " -- columns: " << col << "  rows: " << row << std::endl;
-
-            if (left) {
-                if (pow(2, sizeof (col_type) * 8) - 1 < col) {
-                    std::cerr << "Your vectors have dimensionality " << col << " which is more than what lemp is compiled to store. Change the col_type in BasicStructs.h and recompile." << std::endl;
-                    exit(1);
-                }
-
-                if (pow(2, sizeof (row_type) * 8) - 1 < row) {
-                    std::cerr << "Your dataset has " << row << " vectors which is more than what lemp is compiled to store. Change the row_type in BasicStructs.h and recompile." << std::endl;
-                    exit(1);
-                }
-
-            } else {
-                if (pow(2, sizeof (col_type) * 8) - 1 < row) {
-                    std::cerr << "Your vectors have dimensionality " << row << " which is more than what lemp is compiled to store. Change the col_type in BasicStructs.h and recompile." << std::endl;
-                    exit(1);
-                }
-
-                if (pow(2, sizeof (row_type) * 8) - 1 < col) {
-                    std::cerr << "Your dataset has " << col << " vectors which is more than what lemp is compiled to store. Change the row_type in BasicStructs.h and recompile." << std::endl;
-                    exit(1);
-                }
-            }
-
-            rowNum = (left ? row : col);
-            colNum = (left ? col : row);
-            offset = colNum + 2;
-            sizeDiv2 = colNum & (-2);
+            initializeBasics(colNum, rowNum, false);
 
             if (colNum < NUM_LISTS) {
                 std::cout << "WARNING: Your vectors have dimensionality" << colNum << " and the tuner will try to search among " << NUM_LISTS <<
@@ -147,34 +139,58 @@ namespace ta {
                         " vectors per probe bucket. Perhaps you want to change the parameter LOWER_LIMIT_PER_BUCKET in Definitions.h and recompile" << std::endl;
             }
 
-
-            extraMult = (sizeDiv2 < colNum);
-
-            if (extraMult)
-                offset++;
-
-
-            //std::cout<<"rowNum: "<<rowNum<<" colNum: "<<(int)colNum<<std::endl;
-            normalized = false;
-            //            data = new double[offset * rowNum];            
-            int res = posix_memalign((void **) &data, 16, sizeof (double)* offset * rowNum);
-            //            std::cout << "res: " << res << " null? " << (data == NULL) << std::endl;
-
-            if (res != 0) {
-                std::cout << "Problem with allocating memory" << std::endl;
-                exit(1);
-            }
-
             for (int i = 0; i < rowNum; i++) {
                 setLengthInData(i, 1);
             }
+        }
+        
+        
+        inline void readFromFileCSV(std::string& fileName, ta_size_type col, ta_size_type row) {
+            std::ifstream file(fileName.c_str(), std::ios_base::in);
 
-            if (extraMult) {
-                for (int i = 0; i < rowNum; i++) {
-                    data[(i + 1) * offset - 3] = 0; // zero-out the last padding
+            std::cout << "Reading file: " << fileName << " -- columns: " << col << "  rows: " << row << std::endl;
+
+            rowNum = row;
+            colNum = col;
+
+            VectorMatrix::readFromFileCommon();
+
+            std::string buffer;
+            if (file) {
+                for (ta_size_type i = 0; i < row; i++) {
+                    double* d = getMatrixRowPtr(i);
+
+                    for (ta_size_type j = 0; j < col; j++) {
+                        double f;
+                        file >> f;
+                        if (j != col - 1) {
+                            std::getline(file, buffer, ',');
+                        }
+                        d[j] = f;
+                    }
+                    std::getline(file, buffer);
                 }
             }
 
+            file.close();
+        }
+
+        inline void readFromFileMMA(std::string& fileName, bool left = true) {
+            std::ifstream file(fileName.c_str(), std::ios_base::in);
+            while (file.peek() == '%') {
+                skipLineFromFile(file);
+            }
+
+            ta_size_type col; // columns
+            ta_size_type row; // rows
+            file >> row >> col;
+
+            std::cout << "Reading file: " << fileName << " -- columns: " << col << "  rows: " << row << std::endl;
+
+            rowNum = (left ? row : col);
+            colNum = (left ? col : row);
+
+            VectorMatrix::readFromFileCommon();
 
             if (left) {
                 if (file) {
@@ -189,7 +205,6 @@ namespace ta {
                     }
                 }
                 file.close();
-
             } else {
                 if (file) {
                     for (ta_size_type i = 0; i < col; i++) {// read one column
@@ -206,20 +221,30 @@ namespace ta {
             }
         }
 
-        inline void init(VectorMatrix& matrix, bool sort, bool ignoreLength) {
-            rowNum = matrix.rowNum;
-            colNum = matrix.colNum;
+
+    public:
+
+        inline VectorMatrix() : data(nullptr), shuffled(false), normalized(false), lengthOffset(1) {////////////////////// 1 is for padding
+        }
+
+        inline ~VectorMatrix() {
+            free(data);
+        }
+
+        inline void initializeBasics(col_type numOfColumns, row_type numOfRows, bool norm) {
+            colNum = numOfColumns;
             offset = colNum + 2;
             sizeDiv2 = colNum & (-2);
             extraMult = (sizeDiv2 < colNum);
             if (extraMult)
                 offset++;
 
-            normalized = true;
 
-            //            data = new double[offset * rowNum];
-            int res = posix_memalign((void **) &data, 16, sizeof (double)* offset * rowNum);
-            //            std::cout << "res: " << res << " null? " << (data == NULL) << std::endl;
+            rowNum = numOfRows;
+
+            normalized = norm;
+            lengthInfo.resize(rowNum);
+            int res = posix_memalign((void **) &(data), 16, sizeof (double)* offset * rowNum);
 
             if (res != 0) {
                 std::cout << "Problem with allocating memory" << std::endl;
@@ -227,47 +252,51 @@ namespace ta {
             }
 
             if (extraMult) {
-                for (int i = 0; i < rowNum; i++) {
-                    data[(i + 1) * offset - 3] = 0; // zero-out the last padding
-                }
+                zeroOutLastPadding();
             }
+        }
 
-            lengthInfo.resize(rowNum);
+
+        inline void readFromFile(std::string& fileName, int numCoordinates, int numVectors, bool left = true) {
+            if (boost::algorithm::ends_with(fileName, ".csv")) {
+                if (numCoordinates == 0 || numVectors == 0) {
+                    std::cerr << "When using csv files, you should provide the number of coordinates (--r) and the number of vectors (--m or --n)" << std::endl;
+                    exit(1);
+                }
+                readFromFileCSV(fileName, numCoordinates, numVectors);
+            } else if (boost::algorithm::ends_with(fileName, ".mma")) {
+                readFromFileMMA(fileName, left);
+            } else {
+                std::cerr << "No valid input file format." << std::endl;
+                exit(1);
+            }
+        }
+
+    
+
+        inline void init(VectorMatrix& matrix, bool sort, bool ignoreLength) {
+            initializeBasics(matrix.colNum, matrix.rowNum, true);
+
 
             if (ignoreLength) {
 #pragma omp parallel for  schedule(static, 1000)
                 // get lengths
-                for (int i = 0; i < rowNum; i++) {
-                    double len = 0;
+                for (int i = 0; i < rowNum; ++i) {
                     const double* vec = matrix.getMatrixRowPtr(i);
-                    for (int j = 0; j < colNum; j++) {
-                        len += vec[j] * vec[j];
-                    }
-                    len = sqrt(len);
-
+                    double len = calculateLength(vec, colNum);
                     lengthInfo[i] = QueueElement(1, i);
-
-                    setLengthInData(i, 1); ////////////
+                    setLengthInData(i, 1);
                     double x = 1 / len;
-
                     double * d1 = getMatrixRowPtr(i);
-                    double * d2 = matrix.getMatrixRowPtr(i);
-                    for (int j = 0; j < colNum; j++) {
-                        d1[j] = d2[j] * x;
-                    }
+                    scaleAndCopy(d1, vec, x, colNum);
                 }
 
 
             } else {
 #pragma omp parallel for schedule(static,1000)
-                for (int i = 0; i < rowNum; i++) {
-                    double len = 0;
+                for (int i = 0; i < rowNum; ++i) {
                     const double* vec = matrix.getMatrixRowPtr(i);
-                    for (int j = 0; j < colNum; j++) {
-                        len += vec[j] * vec[j];
-                    }
-                    len = sqrt(len);
-
+                    double len = calculateLength(vec, colNum);
                     lengthInfo[i] = QueueElement(len, i);
                 }
 
@@ -279,66 +308,26 @@ namespace ta {
 
 
 #pragma omp parallel for schedule(static,1000)
-                for (int i = 0; i < rowNum; i++) {
+                for (int i = 0; i < rowNum; ++i) {
                     setLengthInData(i, lengthInfo[i].data);
                     double x = 1 / lengthInfo[i].data;
-
-
                     double * d1 = getMatrixRowPtr(i);
                     double * d2 = matrix.getMatrixRowPtr(lengthInfo[i].id);
-
-                    for (int j = 0; j < colNum; j++) {
-                        d1[j] = d2[j] * x;
-                    }
+                    scaleAndCopy(d1, d2, x, colNum);
                 }
 
             }
         }
 
         inline void addVectors(const VectorMatrix& matrix, std::vector<row_type>& dataIds) {
-            rowNum = dataIds.size();
-            colNum = matrix.colNum;
-            offset = colNum + 2;
-            sizeDiv2 = colNum & (-2);
-            extraMult = (sizeDiv2 < colNum);
-            if (extraMult)
-                offset++;
-
-            normalized = false;
-
-            //            data = new double[offset * rowNum];
-            int res = posix_memalign((void **) &data, 16, sizeof (double)* offset * rowNum);
-            //            std::cout << "res: " << res << " null? " << (data == NULL) << std::endl;
-
-            if (res != 0) {
-                std::cout << "Problem with allocating memory" << std::endl;
-                exit(1);
-            }
-
-            if (extraMult) {
-                for (int i = 0; i < rowNum; i++) {
-                    data[(i + 1) * offset - 3] = 0; // zero-out the last padding
-                }
-            }
-
-            lengthInfo.resize(rowNum);
-
-
-            for (int i = 0; i < rowNum; i++) {
-
+            initializeBasics(matrix.colNum, dataIds.size(), false);
+            for (int i = 0; i < rowNum; ++i) {
                 const double* vec = matrix.getMatrixRowPtr(dataIds[i]);
-
                 lengthInfo[i] = QueueElement(1, dataIds[i]);
-
                 double * d1 = getMatrixRowPtr(i);
-                for (int j = 0; j < colNum; j++) {
-                    d1[j] = vec[j];
-                }
+                scaleAndCopy(d1, vec, 1, colNum);
             }
         }
-
-
-        // please only assign to const double *
 
         inline double* getMatrixRowPtr(row_type row) const {// the row starts from pos 1. Do ptr[-1] to get the length
             return &data[row * offset + 1 + lengthOffset];
@@ -352,7 +341,6 @@ namespace ta {
             return data[row * offset + lengthOffset] = len;
         }
 
-
         inline row_type getId(row_type row) const {
             return (normalized ? lengthInfo[row].id : row);
         }
@@ -363,82 +351,44 @@ namespace ta {
             double cosine = 0;
 
 #ifdef  WITH_SIMD
-
-            //            __m128d sum = _mm_set1_pd(0.0);
-            //
-            //            for (int i = 0; i < sizeDiv2; i += 2) {
-            //                __m128d xmm1 = _mm_loadu_pd(d_ptr + i);
-            //                __m128d xmm2 = _mm_loadu_pd(query + i);
-            //                sum = _mm_add_pd(sum, _mm_mul_pd(xmm1, xmm2));
-            //            }
-            //
-            //            cosine = _mm_cvtsd_f64(_mm_hadd_pd(sum, sum));
-            //
-            //            cosine += extraMult * d_ptr[sizeDiv2] * query[sizeDiv2];
-            //
-            //            //            if(sizeDiv2 < colNum)
-            //            //                cosine += d_ptr[sizeDiv2] * query[sizeDiv2];
-
             __m128d sum = _mm_set1_pd(0.0);
-
             int size = colNum + extraMult;
-
             for (int i = 0; i < size; i += 2) {
-                //                __m128d xmm1 = _mm_load_pd(d_ptr + i);
-                //                __m128d xmm2 = _mm_load_pd(query + i);
                 sum = _mm_add_pd(sum, _mm_mul_pd(_mm_load_pd(d_ptr + i), _mm_load_pd(query + i)));
             }
-
             cosine = _mm_cvtsd_f64(_mm_hadd_pd(sum, sum));
-
-            //            cosine += extraMult * d_ptr[sizeDiv2] * query[sizeDiv2];
-
-            //            if(sizeDiv2 < colNum)
-            //                cosine += d_ptr[sizeDiv2] * query[sizeDiv2];
-
             return cosine;
 #else
-
-
-            for (int i = 0; i < colNum; i++) {
+            for (int i = 0; i < colNum; ++i) {
                 cosine += query[i] * d_ptr[i];
             }
             return cosine;
-
 #endif
         }
 
         inline double L2Distance(row_type row, const double* query)const {
 
             const double* d_ptr = getMatrixRowPtr(row);
-
             double dist = 0;
 
             if (normalized) {
-
-                for (int i = 0; i < colNum; i++) {
+                for (int i = 0; i < colNum; ++i) {
                     double value = query[i] * query[-1] - d_ptr[i] * d_ptr[-1]; // unnormalize
                     dist += value * value;
                 }
-
-                dist = sqrt(dist);
             } else {
-                for (int i = 0; i < colNum; i++) {
+                for (int i = 0; i < colNum; ++i) {
                     dist += (query[i] - d_ptr[i]) * (query[i] - d_ptr[i]);
                 }
-                dist = sqrt(dist);
-
             }
-
-            return dist;
+            return sqrt(dist);
         }
         // I assume non normalized case as needed in PCA trees
 
         inline double L2Distance2(row_type row, const double* query)const {
             const double* d_ptr = getMatrixRowPtr(row);
-
             double dist = 0;
-            for (int i = 0; i < colNum; i++) {
+            for (int i = 0; i < colNum; ++i) {
                 dist += (query[i] - d_ptr[i]) * (query[i] - d_ptr[i]);
             }
             return dist;
@@ -486,32 +436,8 @@ namespace ta {
 
         if (threads == 1) {
 
-            matrices[0].rowNum = originalMatrix.rowNum;
-            matrices[0].colNum = originalMatrix.colNum;
-            matrices[0].offset = matrices[0].colNum + 2;
-            matrices[0].sizeDiv2 = matrices[0].colNum & (-2);
-            matrices[0].extraMult = (matrices[0].sizeDiv2 < matrices[0].colNum);
-            if (matrices[0].extraMult)
-                matrices[0].offset++;
+            matrices[0].initializeBasics(originalMatrix.colNum, originalMatrix.rowNum, true);
 
-            matrices[0].normalized = true;
-            //            matrices[0].data = new double[(matrices[0].offset) * matrices[0].rowNum];
-            int res = posix_memalign((void **) &(matrices[0].data), 16, sizeof (double)* matrices[0].offset * matrices[0].rowNum);
-            //            std::cout << "res: " << res << " null? " << (matrices[0].data == NULL) << std::endl;
-
-            if (res != 0) {
-                std::cout << "Problem with allocating memory" << std::endl;
-                exit(1);
-            }
-
-            matrices[0].lengthInfo.resize(matrices[0].rowNum);
-
-
-            if (matrices[0].extraMult) {
-                for (int i = 0; i < matrices[0].rowNum; i++) {
-                    matrices[0].data[(i + 1) * matrices[0].offset - 3] = 0; // zero-out the last padding
-                }
-            }
 
             if (ignoreLengths) {
 
@@ -520,40 +446,23 @@ namespace ta {
 #endif
 
 
-                for (int i = 0; i < matrices[0].rowNum; i++) {
-                    double len = 0;
+                for (int i = 0; i < matrices[0].rowNum; ++i) {
                     const double* vec = originalMatrix.getMatrixRowPtr(i);
-                    for (int j = 0; j < matrices[0].colNum; j++) {
-                        len += vec[j] * vec[j];
-                    }
-                    len = sqrt(len);
-
+                    double len = calculateLength(vec, matrices[0].colNum);
                     matrices[0].lengthInfo[i] = QueueElement(1, i);
                     matrices[0].setLengthInData(i, 1);
                     double x = 1 / len;
+                    double * d1 = matrices[0].getMatrixRowPtr(i);
+                    scaleAndCopy(d1, vec, x, originalMatrix.colNum);
 #ifdef ABS_APPROX
                     matrices[0].epsilonEquivalents[i] *= x;
-                    //                    std::cout<<"len: "<<len<<" 1/len: "<<x<<" "<<matrices[0].gammaEquivalents[i]<<std::endl;
 #endif
-
-                    double * d1 = matrices[0].getMatrixRowPtr(i);
-                    double * d2 = originalMatrix.getMatrixRowPtr(i);
-
-                    for (int j = 0; j < originalMatrix.colNum; j++) {
-                        d1[j] = d2[j] * x;
-                    }
-
                 }
 
             } else {
-                for (int i = 0; i < matrices[0].rowNum; i++) {
-                    double len = 0;
+                for (int i = 0; i < matrices[0].rowNum; ++i) {
                     const double* vec = originalMatrix.getMatrixRowPtr(i);
-                    for (int j = 0; j < matrices[0].colNum; j++) {
-                        len += vec[j] * vec[j];
-                    }
-                    len = sqrt(len);
-
+                    double len = calculateLength(vec, matrices[0].colNum);
                     matrices[0].lengthInfo[i] = QueueElement(len, i);
                 }
 
@@ -562,19 +471,12 @@ namespace ta {
                     std::sort(matrices[0].lengthInfo.begin(), matrices[0].lengthInfo.end(), std::greater<QueueElement>());
                 }
 
-                for (int i = 0; i < matrices[0].rowNum; i++) {
+                for (int i = 0; i < matrices[0].rowNum; ++i) {
                     matrices[0].setLengthInData(i, matrices[0].lengthInfo[i].data);
-
                     double x = 1 / matrices[0].lengthInfo[i].data;
-
-
                     double * d1 = matrices[0].getMatrixRowPtr(i);
                     double * d2 = originalMatrix.getMatrixRowPtr(matrices[0].lengthInfo[i].id);
-
-                    for (int j = 0; j < originalMatrix.colNum; j++) {
-                        d1[j] = d2[j] * x;
-                    }
-
+                    scaleAndCopy(d1, d2, x, originalMatrix.colNum);
                 }
 
             }
@@ -583,9 +485,9 @@ namespace ta {
 
 
             std::vector<row_type> permuteVector(originalMatrix.rowNum);
-            for (int i = 0; i < permuteVector.size(); i++) {
-                permuteVector[i] = i;
-            }
+            std::iota(permuteVector.begin(), permuteVector.end(), 0);
+
+
             rg::Random32 random(123);
             rg::shuffle(permuteVector.begin(), permuteVector.end(), random);
             std::vector<row_type> blockOffsets;
@@ -596,36 +498,10 @@ namespace ta {
             {
                 row_type tid = omp_get_thread_num();
 
-                matrices[tid].colNum = originalMatrix.colNum;
-                matrices[tid].offset = matrices[tid].colNum + 2;
-                matrices[tid].sizeDiv2 = matrices[tid].colNum & (-2);
-                matrices[tid].extraMult = (matrices[tid].sizeDiv2 < matrices[tid].colNum);
-                if (matrices[tid].extraMult)
-                    matrices[tid].offset++;
-
                 row_type start = blockOffsets[tid];
                 row_type end = (tid == blockOffsets.size() - 1 ? originalMatrix.rowNum : blockOffsets[tid + 1]);
 
-                matrices[tid].rowNum = end - start;
-
-                matrices[tid].normalized = true;
-                matrices[tid].lengthInfo.resize(matrices[tid].rowNum);
-
-                //                matrices[tid].data = new double[(matrices[tid].offset) * matrices[tid].rowNum];
-                int res = posix_memalign((void **) &(matrices[tid].data), 16, sizeof (double)* matrices[tid].offset * matrices[tid].rowNum);
-                //                std::cout << "res: " << res << " null? " << (matrices[tid].data == NULL) << std::endl;
-                if (res != 0) {
-                    std::cout << "Problem with allocating memory" << std::endl;
-                    exit(1);
-                }
-
-                if (matrices[tid].extraMult) {
-                    for (int i = 0; i < matrices[tid].rowNum; i++) {
-                        matrices[tid].data[(i + 1) * matrices[tid].offset - 3] = 0; // zero-out the last padding
-                    }
-                }
-
-
+                matrices[tid].initializeBasics(originalMatrix.colNum, end - start, true);
 
                 if (ignoreLengths) {
 
@@ -633,48 +509,25 @@ namespace ta {
                     matrices[tid].epsilonEquivalents.resize(matrices[tid].rowNum, epsilon);
 #endif
 
-                    for (int i = start; i < end; i++) {
-                        double len = 0;
-
+                    for (int i = start; i < end; ++i) {
                         row_type ind = permuteVector[i];
-
                         const double* vec = originalMatrix.getMatrixRowPtr(ind);
-                        for (int j = 0; j < matrices[tid].colNum; j++) {
-                            len += vec[j] * vec[j];
-                        }
-                        len = sqrt(len);
-
-
+                        double len = calculateLength(vec, matrices[tid].colNum);
                         matrices[tid].lengthInfo[i - start] = QueueElement(1, i - start);
-
-
                         matrices[tid].setLengthInData(i - start, 1);
-
                         double x = 1 / len;
+                        double * d1 = matrices[tid].getMatrixRowPtr(i - start);
+                        scaleAndCopy(d1, vec, x, originalMatrix.colNum);
+                        matrices[tid].lengthInfo[i - start].id = ind; // the original id
 #ifdef ABS_APPROX
                         matrices[tid].epsilonEquivalents[i] *= x;
 #endif
-
-                        double * d1 = matrices[tid].getMatrixRowPtr(i - start);
-                        double * d2 = originalMatrix.getMatrixRowPtr(ind);
-
-                        for (int j = 0; j < originalMatrix.colNum; j++) {
-                            d1[j] = d2[j] * x;
-                        }
-
-                        matrices[tid].lengthInfo[i - start].id = ind; // the original id
-
                     }
                 } else {
-                    for (int i = start; i < end; i++) {
-                        double len = 0;
+                    for (int i = start; i < end; ++i) {
                         row_type ind = permuteVector[i];
                         const double* vec = originalMatrix.getMatrixRowPtr(ind);
-                        for (int j = 0; j < matrices[tid].colNum; j++) {
-                            len += vec[j] * vec[j];
-                        }
-                        len = sqrt(len);
-
+                        double len = calculateLength(vec, matrices[tid].colNum);
                         matrices[tid].lengthInfo[i - start] = QueueElement(len, i - start);
                     }
 
@@ -684,26 +537,16 @@ namespace ta {
                     }
 
 
-                    for (int i = 0; i < matrices[tid].rowNum; i++) {
+                    for (int i = 0; i < matrices[tid].rowNum; ++i) {
                         matrices[tid].setLengthInData(i, matrices[tid].lengthInfo[i].data);
-
                         double x = 1 / matrices[tid].lengthInfo[i].data;
-
                         row_type ind = permuteVector[matrices[tid].lengthInfo[i].id + start];
-
                         double * d1 = matrices[tid].getMatrixRowPtr(i);
                         double * d2 = originalMatrix.getMatrixRowPtr(ind);
-
-                        for (int j = 0; j < originalMatrix.colNum; j++) {
-                            d1[j] = d2[j] * x;
-                        }
-
-
+                        scaleAndCopy(d1, d2, x, originalMatrix.colNum);
                         matrices[tid].lengthInfo[i].id = ind; // the original id
                     }
                 }
-
-
             }
 
         }
@@ -713,16 +556,14 @@ namespace ta {
             const VectorMatrix& userMatrix) {
         globalResults.clear();
         globalResults.reserve(localResults.size() * localResults[0].size()); // queries*k
-        for (long i = 0; i < localResults.size(); i++) {
+        for (long i = 0; i < localResults.size(); ++i) {
             row_type queryId = userMatrix.lengthInfo[i].id;
-            for (long j = 0; j < localResults[i].size(); j++) {
+            for (long j = 0; j < localResults[i].size(); ++j) {
                 globalResults.push_back(MatItem(localResults[i][j].data, queryId, localResults[i][j].id));
             }
         }
     }
 
-   
-    
     inline void localToGlobalIds(const std::vector<QueueElement>& localResults, int k, std::vector<MatItem>& globalResults,
             const VectorMatrix& userMatrix) {
         globalResults.clear();
@@ -731,7 +572,7 @@ namespace ta {
         if (userMatrix.normalized) {
             for (long i = 0; i < localResults.size(); i += k) {
                 row_type queryId = userMatrix.lengthInfo[user].id;
-                for (int j = 0; j < k; j++) {
+                for (int j = 0; j < k; ++j) {
                     globalResults.push_back(MatItem(localResults[i + j].data, queryId, localResults[i + j].id));
                 }
                 user++;
@@ -739,7 +580,7 @@ namespace ta {
         } else {
             for (long i = 0; i < localResults.size(); i += k) {
                 row_type queryId = user;
-                for (int j = 0; j < k; j++) {
+                for (int j = 0; j < k; ++j) {
                     globalResults.push_back(MatItem(localResults[i + j].data, queryId, localResults[i + j].id));
                 }
                 user++;
@@ -760,7 +601,7 @@ namespace ta {
             row_type endUser = rowNum;
 
             if (k == 0) {
-                std::vector<QueueElement>::const_iterator up = std::lower_bound(matrices[tid].lengthInfo.begin(), matrices[tid].lengthInfo.end(), QueueElement(thres, 0), std::greater<QueueElement>());
+                auto up = std::lower_bound(matrices[tid].lengthInfo.begin(), matrices[tid].lengthInfo.end(), QueueElement(thres, 0), std::greater<QueueElement>());
                 endUser = up - matrices[tid].lengthInfo.begin();
             }
 
@@ -768,11 +609,11 @@ namespace ta {
             matrices[tid].maxVectorCoord.resize(rowNum);
             matrices[tid].vectorNNZ.resize(rowNum, 0);
 
-            for (int i = 0; i < endUser; i++) {
+            for (int i = 0; i < endUser; ++i) {
 
                 double * d = matrices[tid].getMatrixRowPtr(i);
 
-                for (int j = 0; j < colNum; j++) {
+                for (int j = 0; j < colNum; ++j) {
 
                     if (matrices[tid].cweights[j] < fabs(d[j]))
                         matrices[tid].cweights[j] = fabs(d[j]);
@@ -782,18 +623,35 @@ namespace ta {
                     if (fabs(d[j]) > matrices[tid].maxVectorCoord[i])
                         matrices[tid].maxVectorCoord[i] = fabs(d[j]);
                 }
-
-
             }
 
 #pragma omp critical
             {
-                for (int i = 0; i < colNum; i++) {
+                for (int i = 0; i < colNum; ++i) {
                     if (global_cweights[i] < matrices[tid].cweights[i])
                         global_cweights[i] = matrices[tid].cweights[i];
                 }
             }
         }
+    }
+
+    inline void writeResults(std::vector< std::vector<MatItem >* >& globalResults, std::string& file) {
+
+        std::ofstream out(file.c_str());
+
+        if (!out.is_open())
+            std::cout << "file " << file << " not open" << std::endl;
+        else
+            std::cout << "file " << file << " open for writing" << std::endl;
+
+        for (auto& threadResult : globalResults) {
+            std::sort(threadResult->begin(), threadResult->end(), std::less<MatItem>());
+
+            for (auto& result : *threadResult) {
+                out << result.i << " " << result.j << " " << result.result << std::endl;
+            }
+        }
+        out.close();
     }
 }
 #endif /* VECTORMATRIX_H_ */

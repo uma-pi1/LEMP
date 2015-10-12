@@ -28,18 +28,8 @@ namespace ta {
     class taRetriever : public Retriever {
     public:
 
-        //double bestTimeLTA;
-        row_type t_b_indx;
-        std::vector<double> high;
-        std::vector<double> low;
-
-        taRetriever() : Retriever(LEMP_TA) {
-        };
-
-        ~taRetriever() {
-        };
-
-        //lists is dummy
+        taRetriever() = default;
+        ~taRetriever() = default;
 
         inline virtual void run(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) {
 
@@ -66,7 +56,7 @@ namespace ta {
             arg->t.stop();
             arg->preprocessTime += arg->t.elapsedTime().nanos();
 #endif
-            
+
             row_type countSeen = 0;
             //check if you need to stop. Otherwise continue;
             while (stopThreshold >= localTheta) {
@@ -76,7 +66,6 @@ namespace ta {
                 //pick up the item
                 oldValue = invLists->getElement(arg->state->fringePos[stepOnCol])->data;
                 posMatrix = invLists->getElement(arg->state->fringePos[stepOnCol])->id;
-//                scanned++;
 #ifdef TIME_IT
                 arg->t.start();
 #endif
@@ -98,10 +87,10 @@ namespace ta {
                 arg->t.stop();
                 arg->scanTime += arg->t.elapsedTime().nanos();
 #endif
-                if (arg->state->allSeen){
+                if (arg->state->allSeen) {
                     break;
                 }
-                    
+
 #ifdef TIME_IT
                 arg->t.start();
 #endif
@@ -111,8 +100,7 @@ namespace ta {
                 arg->boundsTime += arg->t.elapsedTime().nanos();
 #endif
             }
-            
-//            std::cout<<"stopThreshold: "<<stopThreshold<<" scanned: "<<scanned<<std::endl;
+
 
         }
 
@@ -204,7 +192,7 @@ namespace ta {
 
                 retrArg[0].state->initializeForNewBucket(invLists);
 
-                for (row_type i = 0; i < xValues->size(); i++) {
+                for (row_type i = 0; i < xValues->size(); ++i) {
 
                     int t = xValues->at(i).i;
                     int ind = xValues->at(i).j;
@@ -233,7 +221,7 @@ namespace ta {
 
                 retrArg[0].state->initializeForNewBucket(invLists);
 
-                for (row_type i = 0; i < xValues->size(); i++) {
+                for (row_type i = 0; i < xValues->size(); ++i) {
 
                     int t = xValues->at(i).i;
                     int ind = xValues->at(i).j;
@@ -256,16 +244,10 @@ namespace ta {
         inline virtual void runTopK(ProbeBucket& probeBucket, RetrievalArguments* arg) {
             QueueElementLists* invLists = static_cast<QueueElementLists*> (probeBucket.getIndex(SL));
 
+            for (auto& queryBatch : arg->queryBatches) {
 
-            for (row_type q = 0; q < arg->queryBatches.size(); q++) {
-
-                if (arg->queryBatches[q].inactiveCounter == arg->queryBatches[q].rowNum)
+                if (queryBatch.inactiveCounter == queryBatch.rowNum)
                     continue;
-
-                QueryBucket_withTuning& queryBatch = arg->queryBatches[q];
-
-
-
 
                 if (!invLists->initialized) {
 #ifdef TIME_IT
@@ -307,7 +289,6 @@ namespace ta {
                     runTopK(query, probeBucket, arg);
 
                     arg->writeHeapToTopk(user);
-
                     user++;
                 }
 
@@ -320,15 +301,14 @@ namespace ta {
 
             arg->state->initializeForNewBucket(invLists);
 
-            for (row_type q = 0; q < arg->queryBatches.size(); q++) {
+            for (auto& queryBatch : arg->queryBatches) {
 
-                if (arg->queryBatches[q].normL2.second < probeBucket.bucketScanThreshold) {
+                if (queryBatch.normL2.second < probeBucket.bucketScanThreshold) {
                     break;
                 }
 
-                QueryBucket_withTuning& queryBatch = arg->queryBatches[q];
 
-                for (row_type i = queryBatch.startPos; i < queryBatch.endPos; i++) {
+                for (row_type i = queryBatch.startPos; i < queryBatch.endPos; ++i) {
                     const double* query = arg->queryMatrix->getMatrixRowPtr(i);
 
                     if (query[-1] < probeBucket.bucketScanThreshold)// skip all users from this point on for this bucket

@@ -194,8 +194,8 @@ namespace ta {
                 val_t *cwgts, idx_t *rperm, idx_t *cperm) {
             ssize_t i, j, k, nnz;
             idx_t nrows, ncols;
-            da_iikv_t *orderColNnz = NULL;
-            da_ivkv_t *orderMaxVal = NULL;
+            da_iikv_t *orderColNnz = nullptr;
+            da_ivkv_t *orderMaxVal = nullptr;
             char pv = 0;
             ptr_t *rowptr, *nrowptr;
             idx_t *rowind, *nrowind, *tperm;
@@ -214,12 +214,12 @@ namespace ta {
                 csizes[rowind[i]]++;
 
             //assign memory for ordering
-            orderMaxVal = da_ivkvmalloc(nrows, NULL); //"l2apReorderDocs: orderMaxVal"
-            nrowptr = da_pmalloc(nrows + 1, NULL); //"l2apReorderDocs: nrowptr"
-            nrowind = da_imalloc(nnz, NULL); // "l2apReorderDocs: nrowind")
-            nrowval = da_vmalloc(nnz, NULL); //"l2apReorderDocs: nrowval"
+            orderMaxVal = da_ivkvmalloc(nrows, nullptr); //"l2apReorderDocs: orderMaxVal"
+            nrowptr = da_pmalloc(nrows + 1, nullptr); //"l2apReorderDocs: nrowptr"
+            nrowind = da_imalloc(nnz, nullptr); // "l2apReorderDocs: nrowind")
+            nrowval = da_vmalloc(nnz, nullptr); //"l2apReorderDocs: nrowval"
 
-            orderColNnz = da_iikvmalloc(ncols, NULL); //"l2apReorderDocs: orderColNnz"
+            orderColNnz = da_iikvmalloc(ncols, nullptr); //"l2apReorderDocs: orderColNnz"
             //get new column order
 
 
@@ -278,7 +278,7 @@ namespace ta {
 
             //inverse the row permutation
             tperm = rperm;
-            rperm = da_imalloc(nrows, NULL); //"l2apReorderDocs: rperm"
+            rperm = da_imalloc(nrows, nullptr); //"l2apReorderDocs: rperm"
             for (i = 0; i < nrows; i++)
                 rperm[i] = tperm[i];
 
@@ -301,9 +301,10 @@ namespace ta {
 
         comp_type indexSize;
 
-        inline L2apIndex() : params(NULL), rowptr(NULL), endptr(NULL), cands(NULL), rsizes(NULL), csizes(NULL), rperm(NULL), cperm(NULL), hashsz(NULL),
-        rwgts(NULL), rfiwgts(NULL), cwgts(NULL), criwgts(NULL), hashsum(NULL), ps(NULL), lengths(NULL), sums(NULL),
-        invIdx(NULL), indexSize(0) {//, hashval(NULL), hashlen(NULL),hashwgt(NULL),
+        inline L2apIndex() : params(nullptr), rowptr(nullptr), endptr(nullptr), cands(nullptr), rsizes(nullptr), 
+        csizes(nullptr), rperm(nullptr), cperm(nullptr), hashsz(nullptr), rwgts(nullptr), 
+        rfiwgts(nullptr), cwgts(nullptr), criwgts(nullptr), hashsum(nullptr), ps(nullptr), lengths(nullptr), sums(nullptr),
+        invIdx(nullptr), indexSize(0) {//, hashval(NULL), hashlen(NULL),hashwgt(NULL),
 
         }
 
@@ -316,7 +317,7 @@ namespace ta {
                         &invIdx->ids, &invIdx->vals, &invIdx->ends, &invIdx->starts,
                         &invIdx->lens, &invIdx, LTERM); //&invIdx->accum,
 
-                if (params != NULL)
+                if (params != nullptr)
                     freeMyParams(&params);
             }
         }
@@ -327,7 +328,7 @@ namespace ta {
 
 
             if (!initialized) {
-                params = (my_params_t *) gk_malloc(sizeof (my_params_t), NULL);
+                params = (my_params_t *) gk_malloc(sizeof (my_params_t), nullptr);
 
 
                 rg::Timer t;
@@ -356,14 +357,14 @@ namespace ta {
                 params->simT2 = params->simT * params->simT;
 
 
-                rsizes = da_imalloc(nrows, NULL); // "l2apFindNeighbors: rsizes"
-                csizes = da_ismalloc(ncols, 0.0, NULL); //"l2apFindNeighbors: csizes"
-                rperm = da_imalloc(nrows, NULL); //"l2apFindNeighbors: rperm"
-                cperm = da_imalloc(ncols, NULL); //"l2apFindNeighbors: cperm"
-                params->cpermProbeToOrig = da_imalloc(ncols, NULL); //"l2apFindNeighbors: cperm"
-                rwgts = da_vsmalloc(nrows, 0.0, NULL); //"l2apFindNeighbors: rwgts"
-                rfiwgts = da_vmalloc(nrows, NULL); //"l2apFindNeighbors: rfiwgts"
-                cwgts = da_vsmalloc(ncols, 0.0, NULL); //"l2apFindNeighbors: cwgts"
+                rsizes = da_imalloc(nrows, nullptr); // "l2apFindNeighbors: rsizes"
+                csizes = da_ismalloc(ncols, 0.0, nullptr); //"l2apFindNeighbors: csizes"
+                rperm = da_imalloc(nrows, nullptr); //"l2apFindNeighbors: rperm"
+                cperm = da_imalloc(ncols, nullptr); //"l2apFindNeighbors: cperm"
+                params->cpermProbeToOrig = da_imalloc(ncols, nullptr); //"l2apFindNeighbors: cperm"
+                rwgts = da_vsmalloc(nrows, 0.0, nullptr); //"l2apFindNeighbors: rwgts"
+                rfiwgts = da_vmalloc(nrows, nullptr); //"l2apFindNeighbors: rfiwgts"
+                cwgts = da_vsmalloc(ncols, 0.0, nullptr); //"l2apFindNeighbors: cwgts"
 #if defined(RS1) && defined(RS3)
                 criwgts = da_vsmalloc(ncols, 0.0, "l2apFindNeighbors: criwgts");
 #endif
@@ -381,7 +382,7 @@ namespace ta {
                 //hashwgt = da_vmalloc(ncols, NULL); //"l2apFindNeighbors: hashwgt"
 #endif
 #ifdef PSCV
-                ps = da_vmalloc(nrows, NULL); // score prior to indexing threshold for each row //"l2ap2FindNeighbors: ps"
+                ps = da_vmalloc(nrows, nullptr); // score prior to indexing threshold for each row //"l2ap2FindNeighbors: ps"
 #endif
 
                 // reorder matrix
@@ -393,18 +394,18 @@ namespace ta {
                 rowptr = docs->rowptr; // index in rowind/rowval where each row starts
 
                 // allocate memory for candidates and the inverted indexes -- needs nnz & col counts
-                cands = da_imalloc(nrows, NULL); //"l2apFindNeighbors: candidates"
+                cands = da_imalloc(nrows, nullptr); //"l2apFindNeighbors: candidates"
 #if defined(DP1) || defined(DP2) || defined(DP3) || defined(DP4)
                 sums = da_vsmalloc(nnz, 0.0, "l2apFindNeighbors: sums"); // keep track of suffix sums
 #endif
-                lengths = da_vsmalloc(nnz, 0.0, NULL); // keep track of suffix lengths "l2apFindNeighbors: lengths"
-                endptr = da_pmalloc(nrows, NULL); //"l2apFindNeighbors: endptr"
-                invIdx = (da_invIdxJ_t*) gk_malloc(sizeof (da_invIdxJ_t), NULL); //"l2apFindNeighbors: invIdx"
-                invIdx->ids = da_ismalloc(nnz, 0, NULL); //"l2apFindNeighbors: invIdx->ids"
-                invIdx->vals = da_vsmalloc(nnz, 0.0, NULL); //"l2apFindNeighbors: invIdx->ids"
-                invIdx->lens = da_vsmalloc(nnz, 0.0, NULL); //"l2apFindNeighbors: invIdx->ids"
-                invIdx->starts = da_pmalloc(ncols, NULL); //"l2apFindNeighbors: invIdx->starts"
-                invIdx->ends = da_pmalloc(ncols, NULL); //"l2apFindNeighbors: invIdx->ends"
+                lengths = da_vsmalloc(nnz, 0.0, nullptr); // keep track of suffix lengths "l2apFindNeighbors: lengths"
+                endptr = da_pmalloc(nrows, nullptr); //"l2apFindNeighbors: endptr"
+                invIdx = (da_invIdxJ_t*) gk_malloc(sizeof (da_invIdxJ_t), nullptr); //"l2apFindNeighbors: invIdx"
+                invIdx->ids = da_ismalloc(nnz, 0, nullptr); //"l2apFindNeighbors: invIdx->ids"
+                invIdx->vals = da_vsmalloc(nnz, 0.0, nullptr); //"l2apFindNeighbors: invIdx->ids"
+                invIdx->lens = da_vsmalloc(nnz, 0.0, nullptr); //"l2apFindNeighbors: invIdx->ids"
+                invIdx->starts = da_pmalloc(ncols, nullptr); //"l2apFindNeighbors: invIdx->starts"
+                invIdx->ends = da_pmalloc(ncols, nullptr); //"l2apFindNeighbors: invIdx->ends"
                 for (j = 0, k = 0; j < ncols; j++) {
                     invIdx->starts[j] = invIdx->ends[j] = k;
                     k += csizes[j];

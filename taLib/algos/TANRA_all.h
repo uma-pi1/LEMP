@@ -43,12 +43,12 @@ namespace ta {
 
         inline TANRA_all(LEMPArg& args) : args(args), dataManipulationTime(0) {
 
-            if (args.querySideLeft) {
-                queryMatrix.readFromFile(args.usersFile, true); // do not normalize and do not sort
-                probeMatrix.readFromFile(args.itemsFile, false); // do not normalize and do not sort
+             if (args.querySideLeft) {
+                queryMatrix.readFromFile(args.usersFile, args.r, args.m, true);
+                probeMatrix.readFromFile(args.itemsFile, args.r, args.n, false);
             } else {
-                queryMatrix.readFromFile(args.itemsFile, false); // do not normalize and do not sort
-                probeMatrix.readFromFile(args.usersFile, true); // do not normalize and do not sort
+                queryMatrix.readFromFile(args.itemsFile, args.r, args.n, false);
+                probeMatrix.readFromFile(args.usersFile, args.r, args.m, true);
             }
 
             // now do the logging
@@ -66,7 +66,7 @@ namespace ta {
             std::cout << "ALGO: TANRA_all" << std::endl;
             std::cout << "Threads: " << args.threads << std::endl;
 
-            retrArg = new RetrievalArguments(probeMatrix.colNum, queryMatrix, probeMatrix, LEMP_TANRA, false);
+            retrArg = new RetrievalArguments(probeMatrix.colNum, &queryMatrix, &probeMatrix, LEMP_TANRA, false);
             retrArg->k = args.k;
             retrArg->theta = args.theta;
 

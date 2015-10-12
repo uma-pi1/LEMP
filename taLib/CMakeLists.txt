@@ -2,9 +2,6 @@
 
 
 set(ta_SRCS
-# 1. structs
-
-structs/read.cpp
 
 
 ap/csr.c

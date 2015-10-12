@@ -8,5 +8,5 @@ link_libraries( armadillo ${Boost_LIBRARIES} ${RG_LIBRARIES}  ta rg  boost_files
 add_executable(runNaive runNaive.cc)
 add_executable(runAlgoWithTuner runAlgoWithTuner.cc)
 add_executable(runTA_all runTA_all.cc)
-# add_executable(runLSH_all runLSH_all.cc)
+ add_executable(runSimpleLSH runSimpleLSH.cc)
 add_executable(runPCATree runPCATree.cpp)

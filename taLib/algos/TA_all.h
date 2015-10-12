@@ -45,12 +45,12 @@ namespace ta {
 
         inline TA_all(LEMPArg& args) : args(args), dataManipulationTime(0) {
 
-            if (args.querySideLeft) {
-                queryMatrix.readFromFile(args.usersFile, true); // do not normalize and do not sort
-                probeMatrix.readFromFile(args.itemsFile, false); // do not normalize and do not sort
+             if (args.querySideLeft) {
+                queryMatrix.readFromFile(args.usersFile, args.r, args.m, true);
+                probeMatrix.readFromFile(args.itemsFile, args.r, args.n, false);
             } else {
-                queryMatrix.readFromFile(args.itemsFile, false); // do not normalize and do not sort
-                probeMatrix.readFromFile(args.usersFile, true); // do not normalize and do not sort
+                queryMatrix.readFromFile(args.itemsFile, args.r, args.n, false);
+                probeMatrix.readFromFile(args.usersFile, args.r, args.m, true);
             }
 
             // now do the logging
@@ -61,15 +61,15 @@ namespace ta {
             } else {
                 std::cout << "Problem with opening log-file. No log-file will be created" << std::endl;
             }
-            if (args.isTARR){
+            if (args.isTARR) {
                 std::cout << "ALGO: TA_all with RR" << std::endl;
-            }else{
+            } else {
                 std::cout << "ALGO: TA_all with MaxPiQi" << std::endl;
             }
-            
+
             std::cout << "Threads: " << args.threads << std::endl;
 
-            retrArg = new RetrievalArguments(probeMatrix.colNum, queryMatrix, probeMatrix, LEMP_TA, false, args.isTARR);
+            retrArg = new RetrievalArguments(probeMatrix.colNum, &queryMatrix, &probeMatrix, LEMP_TA, false, args.isTARR);
             retrArg->k = args.k;
             retrArg->theta = args.theta;
 
@@ -127,7 +127,7 @@ namespace ta {
                 retrArg->queryId = i;
                 probeBucket.ptrRetriever->run(query, probeBucket, retrArg);
             }
-            thetaResults = &(retrArg->results);            
+            thetaResults = &(retrArg->results);
             t.stop();
 
             std::cout << "Time for retrieval: " << t << std::endl;
@@ -135,14 +135,6 @@ namespace ta {
             std::cout << "Size of result: " << getResultSetSize() << std::endl;
             std::cout << "Preprocessing time: " << dataManipulationTime / 1E9 << std::endl;
             std::cout << "Total time: " << (dataManipulationTime / 1E9) + t.elapsedTime().seconds() << std::endl;
-
-
-//            std::cout << "preprocessTime: " << retrArg->preprocessTime / 1E9 << std::endl;
-//            std::cout << "ipTime: " << retrArg->ipTime / 1E9 << std::endl;
-//            std::cout << "boundsTime: " << retrArg->boundsTime / 1E9 << std::endl;
-//            std::cout << "scanTime: " << retrArg->scanTime / 1E9 << std::endl;
-//            std::cout << "filterTime: " << retrArg->filterTime / 1E9 << std::endl;
-
 
             logging << "\t" << args.theta << "\t" << retrArg->comparisons << "\t" << getResultSetSize() << "\t";
             printTimes(t);
@@ -192,94 +184,13 @@ namespace ta {
             std::cout << "Preprocessing time: " << dataManipulationTime / 1E9 << std::endl;
             std::cout << "Total time: " << (dataManipulationTime / 1E9) + t.elapsedTime().seconds() << std::endl;
 
-//            std::cout << "preprocessTime: " << retrArg->preprocessTime / 1E9 << std::endl;
-//            std::cout << "ipTime: " << retrArg->ipTime / 1E9 << std::endl;
-//            std::cout << "boundsTime: " << retrArg->boundsTime / 1E9 << std::endl;
-//            std::cout << "scanTime: " << retrArg->scanTime / 1E9 << std::endl;
-//            std::cout << "filterTime: " << retrArg->filterTime / 1E9 << std::endl;
-
-
             logging << "\t" << args.k << "\t" << retrArg->comparisons << "\t" << getResultSetSize() << "\t";
             printTimes(t);
             logging.close();
         }
 
-        inline void runTopkPerUser2() { // parallel version
-            comp_type comparisons = 0;
-
-
-            std::cout << "Multiplication starts! k: " << retrArg->k << std::endl;
-            t.start();
-
-
-            QueueElementLists* invLists = static_cast<QueueElementLists*> (probeBucket.getIndex(SL));
-            retrArg->state->initializeForNewBucket(invLists);
-            omp_set_num_threads(args.threads);
-            /////////////////////
-
-            retrArg->topkResults.resize(queryMatrix.rowNum * args.k);
-
-#pragma omp parallel reduction(+ : comparisons)
-            {
-
-                RetrievalArguments arg(probeMatrix.colNum, queryMatrix, probeMatrix, LEMP_TA, false);
-
-                arg.k = args.k;
-                arg.heap.resize(args.k);
-                arg.init(0);
-
-                arg.state->initializeForNewBucket(invLists);
-
-
-#pragma omp for schedule(dynamic,10)
-                for (row_type i = 0; i < queryMatrix.rowNum; i++) {
-
-                    double* query = queryMatrix.getMatrixRowPtr(i);
-                    arg.queryId = i;
-
-                    for (row_type j = 0; j < args.k; j++) {
-                        double ip = queryMatrix.innerProduct(i, probeMatrix.getMatrixRowPtr(j));
-                        arg.comparisons++;
-                        arg.heap[j] = QueueElement(ip, j);
-                    }
-
-                    std::make_heap(arg.heap.begin(), arg.heap.end(), std::greater<QueueElement>()); //make the heap;
-
-
-                    probeBucket.ptrRetriever->runTopK(query, probeBucket, &arg);
-
-                    row_type p = i * args.k;
-                    std::copy(arg.heap.begin(), arg.heap.end(), retrArg->topkResults.begin() + p);
-
-                }
-                comparisons += arg.comparisons;
-
-            }
-            topkResults = &(retrArg->topkResults);
-            t.stop();
-
-            std::cout << "Time for retrieval: " << t << std::endl;
-            std::cout << "Comparisons: " << comparisons << std::endl;
-            std::cout << "Preprocessing time: " << dataManipulationTime / 1E9 << std::endl;
-            std::cout << "Total time: " << (dataManipulationTime / 1E9) + t.elapsedTime().seconds() << std::endl;
-
-
-            logging << "\t" << args.k << "\t" << retrArg->comparisons << "\t" << getResultSetSize() << "\t";
-            printTimes(t);
-
-            if (args.resultsFile != "") {
-                std::vector<MatItem> results;
-                localToGlobalIds(*topkResults, args.k, results, queryMatrix);
-                std::vector< std::vector<MatItem >* > resultsForWriting;
-                resultsForWriting.push_back(&results);
-                writeResults(resultsForWriting, args.resultsFile);
-            }
-
-            logging.close();
-        }
-
+        
         inline void printTimes(rg::Timer& tAll) {
-
             logging << (dataManipulationTime / 1E9) << "\t" << tAll.elapsedTime().seconds() << "\t" << tAll.elapsedTime().seconds()+(dataManipulationTime / 1E9) << "\n";
         }
 

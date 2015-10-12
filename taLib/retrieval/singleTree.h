@@ -45,7 +45,7 @@ namespace ta {
 
     public:
 
-        inline SingleTree() : Retriever(LEMP_TREE) {
+        inline SingleTree() {
             fastmks = new FastMKS<TreeType>(true, false);
         }
 
@@ -83,7 +83,7 @@ namespace ta {
 
                 TreeIndex * index = static_cast<TreeIndex*> (probeBucket.ptrIndexes[TREE]);
 
-                for (row_type i = 0; i < xValues->size(); i++) {
+                for (row_type i = 0; i < xValues->size(); ++i) {
 
                     int t = xValues->at(i).i;
                     int ind = xValues->at(i).j;
@@ -104,7 +104,7 @@ namespace ta {
                 sampleTimes.resize(xValues->size());
                 TreeIndex * index = static_cast<TreeIndex*> (probeBucket.ptrIndexes[TREE]);
 
-                for (row_type i = 0; i < xValues->size(); i++) {
+                for (row_type i = 0; i < xValues->size(); ++i) {
                     int t = xValues->at(i).i;
                     int ind = xValues->at(i).j;
 
@@ -126,12 +126,10 @@ namespace ta {
             TreeIndex * index = static_cast<TreeIndex*> (probeBucket.ptrIndexes[TREE]);
 
 
-            for (row_type q = 0; q < arg->queryBatches.size(); q++) {
+            for (auto& queryBatch : arg->queryBatches) {
 
-                if (arg->queryBatches[q].inactiveCounter == arg->queryBatches[q].rowNum)
+                if (queryBatch.inactiveCounter == queryBatch.rowNum)
                     continue;
-
-                QueryBucket_withTuning& queryBatch = arg->queryBatches[q];
 
                 if (!index->initialized) {
                     index->initializeTree(*(arg->probeMatrix), arg->threads, probeBucket.startPos, probeBucket.endPos);
@@ -147,8 +145,6 @@ namespace ta {
                         continue;
                     }
 
-                    const double* query = arg->queryMatrix->getMatrixRowPtr(user);
-
                     double minScore = arg->topkResults[i].data;
 
                     if (probeBucket.normL2.second < minScore) {// skip this bucket and all other buckets
@@ -159,7 +155,6 @@ namespace ta {
                     }
 
                     arg->moveTopkToHeap(i);
-
                     arg->queryId = arg->queryMatrix->getId(user);
                     fastmks->Search(arg->k, index->tree, arg->probeMatrix, arg->queryMatrix, arg->heap, user, arg->comparisons, arg->threads);
 
@@ -174,16 +169,13 @@ namespace ta {
 
             TreeIndex * index = static_cast<TreeIndex*> (probeBucket.ptrIndexes[TREE]);
 
+            for (auto& queryBatch : arg->queryBatches) {
 
-            for (row_type q = 0; q < arg->queryBatches.size(); q++) {
-
-                if (arg->queryBatches[q].normL2.second < probeBucket.bucketScanThreshold) {
+                if (queryBatch.normL2.second < probeBucket.bucketScanThreshold) {
                     break;
                 }
 
-                QueryBucket_withTuning& queryBatch = arg->queryBatches[q];
-
-                for (row_type i = queryBatch.startPos; i < queryBatch.endPos; i++) {
+                for (row_type i = queryBatch.startPos; i < queryBatch.endPos; ++i) {
                     const double* query = arg->queryMatrix->getMatrixRowPtr(i);
 
                     if (query[-1] < probeBucket.bucketScanThreshold)// skip all users from this point on for this bucket

@@ -54,15 +54,15 @@ namespace ta {
         }
 
 
-        inline QueryBucket_withTuning() : initializedQueues(false), queues(0),
-        inactiveCounter(0),  lshIndex(NULL){
+        inline QueryBucket_withTuning() : initializedQueues(false), queues(nullptr),
+        inactiveCounter(0),  lshIndex(nullptr){
         };
 
         inline ~QueryBucket_withTuning() {
-            if (queues != NULL)
+            if (queues != nullptr)
                 delete[] queues;
 
-            if (lshIndex != NULL)
+            if (lshIndex != nullptr)
                 delete lshIndex;
         }
 
@@ -87,30 +87,30 @@ namespace ta {
         std::vector<QueueElement> tmp;
         tmp.resize(maxLists);
 
-        for (row_type j = 0; j < rowNum; j++) {
+        for (row_type j = 0; j < rowNum; ++j) {
             const double* query = userMatrix.getMatrixRowPtr(j + startPos);
 
-            for (col_type i = 0; i < maxLists; i++) {
+            for (col_type i = 0; i < maxLists; ++i) {
                 double value = fabs(query[i]);
 
                 tmp[i] = QueueElement(value, i);
             }
             std::make_heap(tmp.begin(), tmp.end(), std::greater<QueueElement>());
 
-            for (col_type i = maxLists; i < userMatrix.colNum; i++) {
+            for (col_type i = maxLists; i < userMatrix.colNum; ++i) {
                 double value = fabs(query[i]);
 
 
                 if (value > tmp.front().data) {
                     std::pop_heap(tmp.begin(), tmp.end(), std::greater<QueueElement>());
                     tmp.pop_back();
-                    tmp.push_back(QueueElement(value, i));
+                    tmp.emplace_back(value,i);
                     std::push_heap(tmp.begin(), tmp.end(), std::greater<QueueElement>());
                 }
             }
 
             std::sort(tmp.begin(), tmp.end(), std::greater<QueueElement>());
-            for (col_type i = 0; i < maxLists; i++) {
+            for (col_type i = 0; i < maxLists; ++i) {
                 queues[j * maxLists + i] = tmp[i].id;
             }
         }

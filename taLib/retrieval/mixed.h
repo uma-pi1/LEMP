@@ -31,6 +31,9 @@ namespace ta {
         LengthRetriever plainRetriever;
         X otherRetriever;
 
+        LX_Retriever() = default;
+        ~LX_Retriever() = default;
+
         inline LengthRetriever* getLengthRetriever() {
             return &plainRetriever;
         }
@@ -80,8 +83,9 @@ namespace ta {
             row_type b = retrArg[0].bucketInd;
 
             otherRetriever.xValues = xValues;
+            plainRetriever.sampleTimes.reserve(xValues->size());
 
-            for (row_type i = 0; i < xValues->size(); i++) {
+            for (row_type i = 0; i < xValues->size(); ++i) {
                 int t = xValues->at(i).i;
                 int ind = xValues->at(i).j;
 
@@ -92,37 +96,26 @@ namespace ta {
 
             otherRetriever.tuneTopk(probeBucket, retrArg);
 
-            //            std::cout<<"LENGTH: "<<plainRetriever.sampleTotalTime<<" INCR: "<<otherRetriever.dataForTuning.bestTimeX<<std::endl;
-
             if (plainRetriever.sampleTotalTime < otherRetriever.dataForTuning.bestTime) {
-
                 probeBucket.setAfterTuning(1, 1);
-
             } else {
                 double value = (otherRetriever.dataForTuning.t_b_indx == 0 ? -1 : xValues->at(otherRetriever.dataForTuning.t_b_indx).result);
                 probeBucket.setAfterTuning(otherRetriever.dataForTuning.bestPhi + 1, value);
-
-                //                std::cout<<(int)otherRetriever.dataForTuning.bestNumLists + 1<<std::endl;
-
             }
         }
 
         inline virtual void runTopK(ProbeBucket& probeBucket, RetrievalArguments* arg) {
 
-#ifdef TIME_IT
-            //std::cout<<" LI-based retrieval running "<<std::endl;
-#endif
+
             if (probeBucket.t_b == 1) {
                 plainRetriever.runTopK(probeBucket, arg);
             } else { // do it per query
                 arg->numLists = probeBucket.numLists;
 
-                for (row_type q = 0; q < arg->queryBatches.size(); q++) {
+                for (auto& queryBatch : arg->queryBatches) {
 
-                    if (arg->queryBatches[q].inactiveCounter == arg->queryBatches[q].rowNum)
+                    if (queryBatch.inactiveCounter == queryBatch.rowNum)
                         continue;
-
-                    QueryBucket_withTuning& queryBatch = arg->queryBatches[q];
 
                     row_type user = queryBatch.startPos;
                     int start = queryBatch.startPos * arg->k;
@@ -143,7 +136,7 @@ namespace ta {
                         if (minScoreAppr >= 0) {
                             minScoreAppr *= (1 + arg->gamma);
                             arg->currGammaAppr = (1 + arg->gamma);
-                        }else {
+                        } else {
                             minScoreAppr *= (1 - arg->gamma);
                             arg->currGammaAppr = (1 - arg->gamma);
                         }
@@ -179,7 +172,6 @@ namespace ta {
                             // this can go out of th loop. I run incr for all
                             if (!queryBatch.initializedQueues) { //preprocess
                                 queryBatch.preprocess(*(arg->queryMatrix), arg->maxLists);
-                                //                             arg->queryMatrix->preprocessQueues(queryBatch.startPos, queryBatch.endPos);
                                 queryBatch.initializedQueues = true;
                             }
 #ifdef TIME_IT
@@ -187,7 +179,6 @@ namespace ta {
                             arg->preprocessTime += arg->t.elapsedTime().nanos();
 #endif
                             col_type* localQueue = queryBatch.getQueue(user - queryBatch.startPos, arg->maxLists);
-                            //                         col_type* localQueue = arg->queryMatrix->getQueue(user);
                             arg->setQueues(localQueue);
                             otherRetriever.runTopK(query, probeBucket, arg);
 
@@ -195,7 +186,6 @@ namespace ta {
 
 
                         arg->writeHeapToTopk(user);
-
                         user++;
                     }
                 }
@@ -203,19 +193,14 @@ namespace ta {
         }
 
         inline virtual void run(ProbeBucket& probeBucket, RetrievalArguments* arg) {
+            arg->numLists = probeBucket.numLists;
+            
+            for (auto& queryBatch : arg->queryBatches) {
 
-
-            for (row_type q = 0; q < arg->queryBatches.size(); q++) {
-
-                if (arg->queryBatches[q].normL2.second < probeBucket.bucketScanThreshold) {
+                if (queryBatch.normL2.second < probeBucket.bucketScanThreshold) {
                     break;
                 }
 
-                QueryBucket_withTuning& queryBatch = arg->queryBatches[q];
-
-#ifdef TIME_IT
-                //std::cout<<" LI-based retrieval running "<<std::endl;
-#endif
                 if (probeBucket.t_b == 1 || (probeBucket.t_b * queryBatch.normL2.first > probeBucket.bucketScanThreshold)) {
                     plainRetriever.run(queryBatch, probeBucket, arg);
                 } else if (probeBucket.t_b * queryBatch.normL2.second <= probeBucket.bucketScanThreshold) {
@@ -226,10 +211,8 @@ namespace ta {
                     arg->t.start();
 #endif
 
-                    // this can go out of th loop. I run incr for all
                     if (!queryBatch.initializedQueues) { //preprocess
                         queryBatch.preprocess(*(arg->queryMatrix), arg->maxLists);
-                        //                     arg->queryMatrix->preprocessQueues(queryBatch.startPos, queryBatch.endPos);                 
                         queryBatch.initializedQueues = true;
 
                     }
@@ -237,9 +220,9 @@ namespace ta {
                     arg->t.stop();
                     arg->preprocessTime += arg->t.elapsedTime().nanos();
 #endif
-                    arg->numLists = probeBucket.numLists;
 
-                    for (row_type i = queryBatch.startPos; i < queryBatch.endPos; i++) {
+
+                    for (row_type i = queryBatch.startPos; i < queryBatch.endPos; ++i) {
                         const double* query = arg->queryMatrix->getMatrixRowPtr(i);
 
                         if (query[-1] < probeBucket.bucketScanThreshold)// skip all users from this point on for this bucket
@@ -251,9 +234,6 @@ namespace ta {
                         } else {
 
                             col_type* localQueue = queryBatch.getQueue(i - queryBatch.startPos, arg->maxLists);
-
-                            //                         col_type* localQueue = arg->queryMatrix->getQueue(i);
-
                             arg->setQueues(localQueue);
                             otherRetriever.run(query, probeBucket, arg);
                         }

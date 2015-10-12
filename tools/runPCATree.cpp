@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 /*
-* runNaive.cc
-*
-* Created on: Sep 21, 2012
-* Author: chteflio
-*/
+ * runNaive.cc
+ *
+ * Created on: Sep 21, 2012
+ * Author: chteflio
+ */
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
 
@@ -29,7 +29,7 @@ using namespace ta;
 using namespace boost::program_options;
 
 int main(int argc, char *argv[]) {
-    int k, depth;
+    int k, depth, r, m, n;
     string leftMatrix;
     string rightMatrix;
     string logFile, resultsFile;
@@ -42,10 +42,13 @@ int main(int argc, char *argv[]) {
             ("Q^T", value<string>(&leftMatrix), "file containing the query matrix (left side)")
             ("P", value<string>(&rightMatrix), "file containing the probe matrix (right side)")
             ("k", value<int>(&k)->default_value(5), "top k (default=5)")
-            ("querySideLeft", value<bool>(&querySideLeft)->default_value(true), "1 if Q^T contains the queries (default). Interesting for Row-Top-k") 
+            ("querySideLeft", value<bool>(&querySideLeft)->default_value(true), "1 if Q^T contains the queries (default). Interesting for Row-Top-k")
             ("logFile", value<string>(&logFile)->default_value(""), "output File (contains runtime information)")
-	    ("resultsFile", value<string>(&resultsFile)->default_value(""), "output File (contains the results)")
+            ("resultsFile", value<string>(&resultsFile)->default_value(""), "output File (contains the results)")
             ("d", value<int>(&depth)->default_value(0), "depth of the tree (default=0)")
+            ("r", value<int>(&r)->default_value(0), "num of coordinates in each vector (needed when reading from csv files)")
+            ("m", value<int>(&m)->default_value(0), "num of vectors in Q^T (needed when reading from csv files)")
+            ("n", value<int>(&n)->default_value(0), "num of vectors in P (needed when reading from csv files)")
             ;
 
     positional_options_description pdesc;
@@ -71,7 +74,9 @@ int main(int argc, char *argv[]) {
     args.k = k;
     args.depth = depth;
     args.querySideLeft = querySideLeft;
-
+    args.r = r;
+    args.m = m;
+    args.n = n;
 
     ta::SearchWithPCATree algo(args);
 

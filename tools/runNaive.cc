@@ -29,69 +29,72 @@ using namespace std;
 using namespace ta;
 using namespace boost::program_options;
 
-
-
 int main(int argc, char *argv[]) {
-	double theta;
-	int k;
-	rg::Timer t;
-	string leftMatrix;
-	string rightMatrix;
-	string logFile, resultsFile;
-	string traceVar;
-	bool querySideLeft = true;
+    double theta;
+    int k, r, m, n;
+    rg::Timer t;
+    string leftMatrix;
+    string rightMatrix;
+    string logFile, resultsFile;
+    string traceVar;
+    bool querySideLeft = true;
 
-	// read command line
-	options_description desc("Options");
-	desc.add_options()
-		("help", "produce help message")
-	    ("Q^T", value<string>(&leftMatrix), "file containing Q^T")
-	    ("P", value<string>(&rightMatrix), "file containing the P")
-	    ("theta", value<double>(&theta), "theta")
-	    ("k", value<int>(&k)->default_value(0), "top k (default 0). If 0 Above-theta will run")
-	    ("querySideLeft", value<bool>(&querySideLeft)->default_value(true), "1 if Q^T contains the queries (default). Interesting for Row-Top-k")	   
+    // read command line
+    options_description desc("Options");
+    desc.add_options()
+            ("help", "produce help message")
+            ("Q^T", value<string>(&leftMatrix), "file containing Q^T")
+            ("P", value<string>(&rightMatrix), "file containing the P")
+            ("theta", value<double>(&theta), "theta")
+            ("k", value<int>(&k)->default_value(0), "top k (default 0). If 0 Above-theta will run")
+            ("querySideLeft", value<bool>(&querySideLeft)->default_value(true), "1 if Q^T contains the queries (default). Interesting for Row-Top-k")
             ("logFile", value<string>(&logFile)->default_value(""), "output File (contains runtime information)")
-	    ("resultsFile", value<string>(&resultsFile)->default_value(""), "output File (contains the results)")
-	   
-	;
+            ("resultsFile", value<string>(&resultsFile)->default_value(""), "output File (contains the results)")
+            ("r", value<int>(&r)->default_value(0), "num of coordinates in each vector (needed when reading from csv files)")
+            ("m", value<int>(&m)->default_value(0), "num of vectors in Q^T (needed when reading from csv files)")
+            ("n", value<int>(&n)->default_value(0), "num of vectors in P (needed when reading from csv files)")
 
-	positional_options_description pdesc;
-	pdesc.add("Q^T", 1);
-	pdesc.add("P", 2);
+            ;
 
-	variables_map vm;
-	store(command_line_parser(argc, argv).options(desc).positional(pdesc).run(), vm);
-	notify(vm);
+    positional_options_description pdesc;
+    pdesc.add("Q^T", 1);
+    pdesc.add("P", 2);
 
-	if (vm.count("help") || vm.count("Q^T")==0 || vm.count("P")==0) {
-		cout << "runNaive [options] <Q^T> <P>" << endl << endl;
-	    cout << desc << endl;
-	    return 1;
-	}
-	std::cout<< "Running NAIVE "<<std::endl;
+    variables_map vm;
+    store(command_line_parser(argc, argv).options(desc).positional(pdesc).run(), vm);
+    notify(vm);
 
-	LEMPArg args;
-	args.theta = theta;
-	args.usersFile = leftMatrix;
-	args.itemsFile = rightMatrix;
-	args.logFile = logFile;
-	args.resultsFile = resultsFile;
-	args.k = k;
-	args.querySideLeft = querySideLeft;
-	
+    if (vm.count("help") || vm.count("Q^T") == 0 || vm.count("P") == 0) {
+        cout << "runNaive [options] <Q^T> <P>" << endl << endl;
+        cout << desc << endl;
+        return 1;
+    }
+    std::cout << "Running NAIVE " << std::endl;
 
-	Naive naive(args);
+    LEMPArg args;
+    args.theta = theta;
+    args.usersFile = leftMatrix;
+    args.itemsFile = rightMatrix;
+    args.logFile = logFile;
+    args.resultsFile = resultsFile;
+    args.k = k;
+    args.querySideLeft = querySideLeft;
+    args.r = r;
+    args.m = m;
+    args.n = n;
 
-	if (k > 0){
-		std::cout<< "k: "<<k<<std::endl;
-		naive.topKperUser();
-	}else{
-		std::cout<< "theta: "<<theta<<std::endl;
-		naive.multiply();
-	}
+    Naive naive(args);
+
+    if (k > 0) {
+        std::cout << "k: " << k << std::endl;
+        naive.topKperUser();
+    } else {
+        std::cout << "theta: " << theta << std::endl;
+        naive.multiply();
+    }
 
 
-	return 0;
+    return 0;
 }
 
 

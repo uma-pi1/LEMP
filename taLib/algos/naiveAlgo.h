@@ -41,13 +41,12 @@ namespace ta {
         inline Naive(LEMPArg& args) : args(args) {
             VectorMatrix leftMatrix, rightMatrix;
 
-
             if (args.querySideLeft) {
-                leftMatrix.readFromFile(args.usersFile, true);
-                rightMatrix.readFromFile(args.itemsFile, false);
+                leftMatrix.readFromFile(args.usersFile, args.r, args.m, true);
+                rightMatrix.readFromFile(args.itemsFile, args.r, args.n, false);
             } else {
-                leftMatrix.readFromFile(args.itemsFile, false);
-                rightMatrix.readFromFile(args.usersFile, true);
+                leftMatrix.readFromFile(args.itemsFile, args.r, args.n, false);
+                rightMatrix.readFromFile(args.usersFile, args.r, args.m, true);
             }
 
             queryMatrix.init(leftMatrix, false, false);
@@ -59,7 +58,7 @@ namespace ta {
             //                        probeMatrix.init(rightMatrix, true, false); // just to check
 
 
-            retrArg = new RetrievalArguments(probeMatrix.colNum, queryMatrix, probeMatrix, args.method);
+            retrArg = new RetrievalArguments(probeMatrix.colNum, &queryMatrix, &probeMatrix, args.method);
             retrArg->theta = args.theta;
             retrArg->k = args.k;
 
@@ -84,136 +83,51 @@ namespace ta {
                 delete retrArg;
         }
 
-        void multiply() {
+
+        void multiply() {// for parallel execution
             rg::Timer t;
-            std::pair<bool, double> p;
             retrArg->comparisons = 0;
             LengthRetriever plainRetriever;
-
+            comp_type comparisons = 0;
             t.start();
-            for (row_type i = 0; i < queryMatrix.rowNum; i++) {
-                double* query = queryMatrix.getMatrixRowPtr(i);
-                retrArg->queryId = i;
-                plainRetriever.naive(query, 0, probeMatrix.rowNum, retrArg);
+
+            omp_set_num_threads(args.threads);
+
+#pragma omp parallel reduction(+ : comparisons)
+            {
+
+                RetrievalArguments arg(probeMatrix.colNum, &queryMatrix, &probeMatrix, args.method);
+                arg.theta = args.theta;
+
+#pragma omp for schedule(dynamic,10)  
+                for (row_type i = 0; i < queryMatrix.rowNum; i++) {
+                    double* query = queryMatrix.getMatrixRowPtr(i);
+                    arg.queryId = i;
+                    plainRetriever.naive(query, 0, probeMatrix.rowNum, &arg);
+                }
+
+                comparisons += arg.comparisons;
+
             }
+
             thetaResults = &(retrArg->results);
             t.stop();
 
-            std::cout << "TIME for 2 sided: " << t << std::endl;
-            std::cout << "Result Size: " << getResultSetSize() << " " << (retrArg->results).size() << std::endl;
-            std::cout << "Number of comparisons: " << retrArg->comparisons << std::endl;
+            std::cout << "TIME: " << t << std::endl;
+            std::cout << "Result Size: " << getResultSetSize() << std::endl;
+            std::cout << "Number of comparisons: " << comparisons << std::endl;
 
             if (args.resultsFile != "") {
                 std::vector< std::vector<MatItem >* > resultsForWriting;
                 resultsForWriting.push_back(thetaResults);
                 writeResults(resultsForWriting, args.resultsFile);
             }
-
-
         }
 
-        //         void multiply() {// for parallel execution
-        //             rg::Timer t;
-        //             std::pair<bool, double> p;
-        //             retrArg->comparisons = 0;
-        //             LengthRetriever plainRetriever;
-        //             comp_type comparisons = 0;
-        //             t.start();
-        // 
-        //             omp_set_num_threads(args.threads);
-        // 
-        // #pragma omp parallel reduction(+ : comparisons)
-        //             {
-        // 
-        //                 RetrievalArguments arg(probeMatrix.colNum, queryMatrix, probeMatrix, args.method);
-        //                 arg.theta = args.theta;
-        // 
-        // #pragma omp for schedule(dynamic,10)  
-        //                 for (row_type i = 0; i < queryMatrix.rowNum; i++) {
-        //                     double* query = queryMatrix.getMatrixRowPtr(i);
-        //                     arg.queryId = i;
-        //                     plainRetriever.naive(query, 0, probeMatrix.rowNum, &arg);
-        //                 }
-        // 
-        //                 comparisons += arg.comparisons;
-        // 
-        //             }
-        // 
-        //             thetaResults = &(retrArg->results);
-        //             t.stop();
-        // 
-        //             std::cout << "TIME: " << t << std::endl;
-        // 	    std::cout << "Result Size: " << getResultSetSize() << std::endl;
-        //             std::cout << "Number of comparisons: " << comparisons << std::endl;
-        // 	    
-        // 	    if(args.resultsFile != ""){
-        // 		std::vector< std::vector<MatItem >* > resultsForWriting;
-        // 		resultsForWriting.push_back(thetaResults);
-        // 		writeResults(resultsForWriting, args.resultsFile);
-        // 	    }
-        // 	    
-        // 	    
-        //         }
-
-
-
-        //                 void topKperUser() {
-        //                     rg::Timer timer;
-        //                     double minScore = 0;
-        //                     retrArg->comparisons = 0;
-        //                     LengthRetriever plainRetriever;
-        //         
-        //                     timer.start();
-        //         
-        //                     retrArg->topkResults.resize(queryMatrix.rowNum * args.k);
-        //                     retrArg->heap.resize(args.k);
-        //         
-        //                     for (row_type i = 0; i < queryMatrix.rowNum; i++) {
-        //         
-        //                         double* query = queryMatrix.getMatrixRowPtr(i);
-        //                         retrArg->queryId = i;
-        //         
-        //                         for (row_type j = 0; j < args.k; j++) {
-        //                             double ip = queryMatrix.innerProduct(i, probeMatrix.getMatrixRowPtr(j));
-        //                             retrArg->comparisons++;
-        //                             retrArg->heap[j] = QueueElement(ip, j);                    
-        //                         }
-        //         
-        //                         std::make_heap(retrArg->heap.begin(), retrArg->heap.end(), std::greater<QueueElement>()); //make the heap;
-        //         
-        //                         plainRetriever.naiveTopk(query, retrArg->k, probeMatrix.rowNum, retrArg);
-        //         
-        //                         retrArg->writeHeapToTopk(i);
-        //         
-        //                     }
-        //         
-        //         
-        //                     topkResults = &(retrArg->topkResults);
-        //                     timer.stop();
-        //         
-        //                     std::cout << "TIME for 2 sided: " << timer << std::endl;
-        //                     std::cout << "Result Size: " << getResultSetSize() << std::endl;
-        //                     std::cout << "Number of comparisons: " << retrArg->comparisons << std::endl;
-        //         
-        // 		    
-        // 		    if(args.resultsFile != ""){
-        // 			  std::vector<MatItem> results;
-        // 			  localToGlobalIds(*topkResults, args.k, results, queryMatrix);
-        // 			  std::vector< std::vector<MatItem >* > resultsForWriting;
-        // 			  resultsForWriting.push_back(&results);
-        // 			  writeResults(resultsForWriting, args.resultsFile);
-        // 		    }
-        //         
-        //                 }
-
-
-        // this is for the parallel experiment
 
         void topKperUser() {
             rg::Timer timer;
-            double minScore = 0;
             retrArg->comparisons = 0;
-
 
             timer.start();
             retrArg->allocTopkResults();
@@ -225,7 +139,7 @@ namespace ta {
 #pragma omp parallel reduction(+ : comparisons)
             {
 
-                RetrievalArguments arg(probeMatrix.colNum, queryMatrix, probeMatrix, args.method);
+                RetrievalArguments arg(probeMatrix.colNum, &queryMatrix, &probeMatrix, args.method);
                 arg.theta = args.theta;
                 arg.k = args.k;
                 arg.heap.resize(args.k);

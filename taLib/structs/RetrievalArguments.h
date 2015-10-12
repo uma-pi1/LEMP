@@ -43,7 +43,7 @@ namespace ta {
 
         std::vector<double> accum, hashval; // for L2AP
         double* hashlen; // for L2AP
-        double*  hashwgt;// for L2AP
+        double* hashwgt; // for L2AP
 
         // for tuning
         std::vector<double>* competitorMethod;
@@ -67,7 +67,7 @@ namespace ta {
         int threads, k;
         int prevBucketBestPhi; // to be used during tuning
 
-       
+
         double theta, t_b, R, epsilon, currEpsilonAppr; // for ICOORD or COORD
         double worstMinScore; // for L2AP
         double boundsTime, ipTime, scanTime, preprocessTime, filterTime, initializeListsTime, lengthTime;
@@ -83,21 +83,19 @@ namespace ta {
         bool forCosine; // to be used for TA
         bool isTARR; // true: TAStateRR  false: TAStateMAX
 
-        RetrievalArguments(col_type colnum, VectorMatrix& queryMatrix, VectorMatrix& probeMatrix, LEMP_Method method,
-                bool forCosine = true, bool isTARR = false) :
-        colnum(colnum), comparisons(0), probeMatrix(&probeMatrix), queryMatrix(&queryMatrix), forCosine(forCosine), method(method),
-        boundsTime(0), ipTime(0), scanTime(0), preprocessTime(0), filterTime(0), initializeListsTime(0), lengthTime(0), state(0), tanraState(0),
-        prevBucketBestPhi(-1), threads(1), worstMinScore(std::numeric_limits<double>::max()), hashwgt(NULL), hashlen(NULL),
-        competitorMethod(0), sketches(0), rig(NULL), isTARR(isTARR), cp_array(NULL), ext_cp_array(NULL), candidatesToVerify(NULL) {
-            random = rg::Random32(123); // PSEUDO-RANDOM
 
+        // with constructor delegation
+
+        inline RetrievalArguments() : RetrievalArguments(0, nullptr, nullptr, LEMP_L) {
         }
 
-        inline RetrievalArguments() : comparisons(0), forCosine(true), boundsTime(0), ipTime(0), scanTime(0),
-        preprocessTime(0), filterTime(0), initializeListsTime(0), lengthTime(0), state(0), tanraState(0),
-        prevBucketBestPhi(-1), threads(1), colnum(0), queryMatrix(0), probeMatrix(0), competitorMethod(0), sketches(0), rig(NULL), cp_array(NULL),
-        ext_cp_array(NULL), isTARR(false), candidatesToVerify(NULL), hashwgt(NULL), hashlen(NULL) {
-            random = rg::Random32(123);
+        RetrievalArguments(col_type colnum, VectorMatrix* queryMatrix, VectorMatrix* probeMatrix, LEMP_Method method,
+                bool forCosine = true, bool isTARR = false) :
+        colnum(colnum), comparisons(0), probeMatrix(probeMatrix), queryMatrix(queryMatrix), forCosine(forCosine), method(method),
+        boundsTime(0), ipTime(0), scanTime(0), preprocessTime(0), filterTime(0), initializeListsTime(0), lengthTime(0), state(nullptr), tanraState(nullptr),
+        prevBucketBestPhi(-1), threads(1), worstMinScore(std::numeric_limits<double>::max()), hashwgt(nullptr), hashlen(nullptr),
+        competitorMethod(nullptr), sketches(nullptr), rig(nullptr), isTARR(isTARR), cp_array(nullptr), ext_cp_array(nullptr), candidatesToVerify(nullptr) {
+            random = rg::Random32(123); // PSEUDO-RANDOM
         }
 
         inline void initializeBasics(
@@ -126,26 +124,25 @@ namespace ta {
         }
 
         ~RetrievalArguments() {
-            if (state != 0)
+            if (state != nullptr)
                 delete state;
-            if (tanraState != 0)
+            if (tanraState != nullptr)
                 delete tanraState;
-            if (cp_array != 0)
+            if (cp_array != nullptr)
                 delete[] cp_array;
-            if (ext_cp_array != 0)
+            if (ext_cp_array != nullptr)
                 delete[] cp_array;
-            if (candidatesToVerify != 0)
+            if (candidatesToVerify != nullptr)
                 delete[] candidatesToVerify;
-            if (hashlen != 0)
+            if (hashlen != nullptr)
                 delete[] hashlen;
-            if (hashwgt != 0)
+            if (hashwgt != nullptr)
                 delete[] hashwgt;
-            if (method == LEMP_LSH) {
-                if (sketches)
-                    delete[] sketches;
-                if (rig)
-                    delete rig;
-            }
+            if (sketches != nullptr)
+                delete[] sketches;
+            if (rig != nullptr)
+                delete rig;
+
         }
 
         inline void clear() {
@@ -162,6 +159,7 @@ namespace ta {
 
         inline void moveTopkToHeap(row_type pos) {
             std::copy(topkResults.begin() + pos, topkResults.begin() + pos + k, heap.begin());
+
         }
 
         inline void writeHeapToTopk(row_type queryPos) {
@@ -170,11 +168,11 @@ namespace ta {
         }
 
         inline void initThetaForActiveBlocks() {
-            thetaForActiveBlocks.resize(LSH_SIGNATURES);
+            thetaForActiveBlocks.reserve(LSH_SIGNATURES);
             double logNom = log(1 - R);
             double exponent = 1 / ((double) LSH_CODE_LENGTH); //0.125; // 1/8 LSH_CODE_LENGTH
 
-            for (int b = 0; b < LSH_SIGNATURES; b++) {
+            for (int b = 0; b < LSH_SIGNATURES; ++b) {
                 double logDenom = logNom / (b + 1);
                 double denom = exp(logDenom);
                 double thres8 = 1 - denom;
@@ -182,14 +180,13 @@ namespace ta {
                 double acosThres = (1 - thres) * PI;
                 double theta = cos(acosThres);
 
-                thetaForActiveBlocks[b].data = theta;
-                thetaForActiveBlocks[b].id = b + 1;
+                thetaForActiveBlocks.emplace_back(theta, b + 1);
             }
             std::sort(thetaForActiveBlocks.begin(), thetaForActiveBlocks.end(), std::less<QueueElement>());
         }
 
         inline int findActiveBlocks(double theta) {
-            std::vector<QueueElement>::iterator it = std::upper_bound(thetaForActiveBlocks.begin(), thetaForActiveBlocks.end(), QueueElement(theta, 0));
+            auto it = std::upper_bound(thetaForActiveBlocks.begin(), thetaForActiveBlocks.end(), QueueElement(theta, 0));
 
             int pos = it - thetaForActiveBlocks.begin();
             if (pos >= thetaForActiveBlocks.size()) {
@@ -243,15 +240,10 @@ namespace ta {
             if (method == LEMP_LSH) {
                 rig = new RandomIntGaussians(colnum, LSH_SIGNATURES * LSH_CODE_LENGTH);
                 done.resize(maxProbeBucketSize);
-                
-                if (forCosine) {
-                    initThetaForActiveBlocks();
-                    long long totalSketchSize = ((long) maxProbeBucketSize) * (LSH_CODE_LENGTH / 8) * ((long) LSH_SIGNATURES);
-                    sketches = new uint8_t[totalSketchSize]();
-                } else { // forCosine=false here means that I am running the simple-LSH therefore I will try to reduce the cost of LSH signature creation
-                    long long totalSketchSize = (LSH_CODE_LENGTH / 8) * ((long) LSH_SIGNATURES);
-                    sketches = new uint8_t[totalSketchSize]();
-                }
+
+                initThetaForActiveBlocks();
+                long long totalSketchSize = ((long) maxProbeBucketSize) * (LSH_CODE_LENGTH / 8) * ((long) LSH_SIGNATURES);
+                sketches = new uint8_t[totalSketchSize]();
 
                 sums.resize(LSH_SIGNATURES * LSH_CODE_LENGTH, 0);
                 if (LSH_CODE_LENGTH == 8)
@@ -268,7 +260,6 @@ namespace ta {
 
         inline void setIntervals(col_type lists) {
             maxLists = lists;
-            intervals.reserve(maxLists + 1);
             intervals.resize(maxLists);
             comparisons = 0;
         }

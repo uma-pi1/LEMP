@@ -35,8 +35,6 @@ namespace ta {
 
         int doubleSize = 8; //bytes
         int row_typeSize = sizeof(row_type);
-        int col_typeSize = sizeof(col_type);
-        int comp_typeSize = sizeof(comp_type);
         double t = 0.8;
 
         int singleVectorSpace = (rank + 1) * doubleSize + (doubleSize+row_typeSize); // the basic thing (coordinates+length) + lengthInfo
@@ -114,7 +112,7 @@ namespace ta {
             double value = elements[blockOffsets[blockOffsets.size() - 1]].data * factor;
 
 
-            std::vector<QueueElement>::iterator up = std::upper_bound(elements.begin(), elements.begin() + size, QueueElement(value, 0), std::greater<QueueElement>());
+            auto up = std::upper_bound(elements.begin(), elements.begin() + size, QueueElement(value, 0), std::greater<QueueElement>());
             ind = up - elements.begin();
             if (ind - blockOffsets[blockOffsets.size() - 1] < minItems) {
                 ind = blockOffsets[blockOffsets.size() - 1] + minItems;
@@ -185,9 +183,9 @@ namespace ta {
 
         row_type start, end;
         buckets.clear();
-        buckets.resize(blockOffsets.size());
+        buckets.resize(blockOffsets.size());         
 
-        for (row_type i = 0; i < blockOffsets.size(); i++) {
+        for (row_type i = 0; i < blockOffsets.size(); ++i) {
             start = blockOffsets[i];
             end = (i == (blockOffsets.size() - 1) ? matrix.rowNum : blockOffsets[i + 1]);
             buckets[i].init(matrix, start, end, args);

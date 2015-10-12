@@ -21,7 +21,6 @@
 #include <util/random.h>
 
 #include <taLib/structs/Definitions.h>
-#include <taLib/structs/read.h>
 #include <taLib/structs/BasicStructs.h>
 #include <taLib/structs/Args.h>
 
@@ -77,7 +76,7 @@
 #include <taLib/algos/PCATree.h>
 #include <taLib/algos/TA_all.h>
 #include <taLib/algos/TANRA_all.h>
-// #include <taLib/algos/LSH_all2.h>
+#include <taLib/algos/SimpleLSH.h>
 #include <taLib/algos/algo_with_tuning.h>
 
 

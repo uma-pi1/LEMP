@@ -55,12 +55,14 @@ struct LEMPArg{
         double R, epsilon; // for LSH R:recall
 	col_type listsForExplorationMode;
 	double dataManipulationTime, tuningTime;
+        
+        int r, m, n;// rank, numUsers, numItems: necessary only when reading a csv file
 
 	double boundsTime, ipTime, scanTime, preprocessTime, filterTime, initializeListsTime, speedyTime;
 
 
 	LEMPArg():k(0), querySideLeft(true), cacheSizeinKB (8192), method(LEMP_LI), boundsTime(0), ipTime(0), scanTime(0), preprocessTime(0), filterTime(0), speedyTime(0), initializeListsTime(0),
-			dataManipulationTime(0), tuningTime(0), threads(1), listsForExplorationMode(1), depth(5), R(1.0), epsilon(0), isTARR (false){}
+			dataManipulationTime(0), tuningTime(0), threads(1), listsForExplorationMode(1), depth(5), R(1.0), epsilon(0), isTARR (false), r(0), m(0), n(0){}
 
 	void printTimes(){
 		std::cout<< "Preprocessing Time: "<<dataManipulationTime/1E9 <<std::endl;

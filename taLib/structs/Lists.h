@@ -110,12 +110,9 @@ namespace ta {
         col_type colNum;
         row_type size;
 
-        inline QueueElementLists() {
-        }
+        inline QueueElementLists()  = default;
 
-        inline ~QueueElementLists() {
-
-        }
+        inline ~QueueElementLists()  = default;
 
         inline void initializeLists(const VectorMatrix& matrix, ta_size_type start = 0, ta_size_type end = 0) {
             omp_set_lock(&writelock);
@@ -131,10 +128,9 @@ namespace ta {
                 size = end - start;
                 sortedCoord.reserve(colNum * size);
 
-                for (col_type j = 0; j < colNum; j++) {
-                    for (row_type i = start; i < end; i++) { // scans the matrix as it is, i.e., perhaps in sorted order
-
-                        sortedCoord.push_back(QueueElement(matrix.getMatrixRowPtr(i)[j], i - start));
+                for (col_type j = 0; j < colNum; ++j) {
+                    for (row_type i = start; i < end; ++i) { // scans the matrix as it is, i.e., perhaps in sorted order
+                        sortedCoord.emplace_back(matrix.getMatrixRowPtr(i)[j], i - start);
                         // QueueElement.id is the position of the vector in the matrix, not necessarily the vectorID
                     }
                     std::sort(sortedCoord.begin()+(j * size), sortedCoord.end(), std::less<QueueElement>());
@@ -169,7 +165,7 @@ namespace ta {
 
             std::pair<row_type, row_type> necessaryIndices;
 
-            for (col_type i = 0; i < lists; i++) {
+            for (col_type i = 0; i < lists; ++i) {
 
                 getBounds(query[listsQueue[i]], localTheta, listsQueue[i], necessaryIndices);
 
@@ -257,11 +253,9 @@ namespace ta {
 
         std::vector<row_type> ids;
 
-        inline IntLists() {
-        }
+        inline IntLists()  = default;
 
-        inline ~IntLists() {
-        }
+        inline ~IntLists()  = default;
 
         inline void initializeLists(const VectorMatrix& matrix, ta_size_type start = 0, ta_size_type end = 0) {
             omp_set_lock(&writelock);
@@ -283,16 +277,17 @@ namespace ta {
                 ids.reserve(colNum * size);
                 values.reserve(colNum * size);
 
-                for (col_type i = 0; i < colNum; i++) {
+                for (col_type i = 0; i < colNum; ++i) {
 
-                    for (row_type j = start; j < end; j++) { // scans the matrix as it is, i.e., perhaps in sorted order
-                        sortedCoord[i].push_back(QueueElement(matrix.getMatrixRowPtr(j)[i], j - start));
+                    for (row_type j = start; j < end; ++j) { // scans the matrix as it is, i.e., perhaps in sorted order
+//                        sortedCoord[i].push_back(QueueElement(matrix.getMatrixRowPtr(j)[i], j - start));
+                        sortedCoord[i].emplace_back(matrix.getMatrixRowPtr(j)[i], j - start);
                         // i is the position of the vector in the matrix, not necessarily the vectorID
                     }
 
                     std::sort(sortedCoord[i].begin(), sortedCoord[i].end(), std::less<QueueElement>());
 
-                    for (row_type j = 0; j < sortedCoord[i].size(); j++) {
+                    for (row_type j = 0; j < sortedCoord[i].size(); ++j) {
                         ids.push_back(sortedCoord[i][j].id);
                         values.push_back(sortedCoord[i][j].data);
                     }
@@ -327,7 +322,7 @@ namespace ta {
 
             std::pair<row_type, row_type> necessaryIndices;
 
-            for (col_type i = 0; i < lists; i++) {
+            for (col_type i = 0; i < lists; ++i) {
 
                 getBounds(query[listsQueue[i]], localTheta, listsQueue[i], necessaryIndices);
 
