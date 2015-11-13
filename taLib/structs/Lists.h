@@ -26,9 +26,10 @@
 namespace ta {
 
     class Index {
-    public:
-        bool initialized;
+    protected:
         omp_lock_t writelock;
+        bool initialized;
+    public:
 
         inline Index() : initialized(false) {
             omp_init_lock(&writelock);
@@ -38,19 +39,34 @@ namespace ta {
             omp_destroy_lock(&writelock);
         }
 
+        inline bool isInitialized() const {
+            return initialized;
+        }
+
+        inline void lockIndex() {
+            omp_set_lock(&writelock);
+        }
+
+        inline void unlockIndex() {
+            omp_unset_lock(&writelock);
+        }
+
     };
 
     class QueueElementLists : public Index {
+        std::vector<QueueElement> sortedCoord;
+        col_type colNum;
+        row_type size;
 
         /*
          * returns true if there is possibility for sufficient, otherwise false
          */
-        inline bool getBounds(double qi, double theta, col_type col, std::pair<row_type, row_type>& necessaryIndices) {
+        inline bool getBounds(double qi, double theta, col_type col, std::pair<row_type, row_type>& necessaryIndices) const {
 
             bool suff = false;
             double base, x, root1, root2;
             std::pair<double, double> necessaryValues;
-            std::vector<QueueElement>::iterator it;
+            std::vector<QueueElement>::const_iterator it;
 
             // get bounds in the form of values
             base = theta * qi;
@@ -64,25 +80,25 @@ namespace ta {
 
             row_type start = col * size;
             row_type end = (col + 1) * size;
-	    
-	    double y = theta / qi;
-            
+
+            double y = theta / qi;
+
 
             if (qi > 0 && necessaryValues.second >= y) {
                 necessaryValues.second = 1;
                 suff = true;
-		
-		if(necessaryValues.first > y){
-		  necessaryValues.first = y;	
-		}
+
+                if (necessaryValues.first > y) {
+                    necessaryValues.first = y;
+                }
 
             } else if (qi < 0 && necessaryValues.first <= y) {
                 necessaryValues.first = -1;
                 suff = true;
-		
-		if(necessaryValues.second < y){
-		  necessaryValues.second = y;	
-		}
+
+                if (necessaryValues.second < y) {
+                    necessaryValues.second = y;
+                }
             }
 
             if (necessaryValues.first <= sortedCoord[col * size].data) {
@@ -99,22 +115,17 @@ namespace ta {
                 it = std::upper_bound(sortedCoord.begin() + start, sortedCoord.begin() + end, QueueElement(necessaryValues.second, 0));
                 necessaryIndices.second = (it - sortedCoord.begin());
             }
-            
+
             return suff;
         }
 
     public:
 
-
-        std::vector<QueueElement> sortedCoord;
-        col_type colNum;
-        row_type size;
-
-        inline QueueElementLists()  = default;
-
-        inline ~QueueElementLists()  = default;
+        inline QueueElementLists() = default;
+        inline ~QueueElementLists() = default;
 
         inline void initializeLists(const VectorMatrix& matrix, ta_size_type start = 0, ta_size_type end = 0) {
+
             omp_set_lock(&writelock);
 
             if (!initialized) {
@@ -140,7 +151,7 @@ namespace ta {
             omp_unset_lock(&writelock);
         }
 
-        inline row_type getRowPointer(row_type row, col_type col) {
+        inline row_type getRowPointer(row_type row, col_type col) const {
             return sortedCoord[col * size + row].id;
         }
 
@@ -148,20 +159,20 @@ namespace ta {
             return &sortedCoord[pos];
         }
 
-        inline double getValue(row_type row, col_type col) {
+        inline double getValue(row_type row, col_type col) const {
             return sortedCoord[col * size + row].data;
         }
 
-        inline col_type getColNum() {
+        inline col_type getColNum() const {
             return colNum;
         }
 
-        inline row_type getRowNum() {
+        inline row_type getRowNum() const {
             return size;
         }
 
         inline bool calculateIntervals(const double* query, const col_type* listsQueue, std::vector<IntervalElement>& intervals,
-                double localTheta, col_type lists) {
+                double localTheta, col_type lists) const {
 
             std::pair<row_type, row_type> necessaryIndices;
 
@@ -190,12 +201,15 @@ namespace ta {
 
     class IntLists : public Index {
         std::vector<double> values;
+        std::vector<row_type> ids;
+        col_type colNum;
+        row_type size;
 
-        inline void getBounds(double qi, double theta, col_type col, std::pair<row_type, row_type>& necessaryIndices) {
+        inline void getBounds(double qi, double theta, col_type col, std::pair<row_type, row_type>& necessaryIndices) const {
 
             double base, x, root1, root2;
             std::pair<double, double> necessaryValues;
-            std::vector<double>::iterator it;
+            std::vector<double>::const_iterator it;
 
             // get bounds in the form of values
             base = theta * qi;
@@ -210,24 +224,22 @@ namespace ta {
             row_type start = col * size;
             row_type end = (col + 1) * size;
 
-	    double y = theta / qi;
+            double y = theta / qi;
 
 
             if (qi > 0) {
                 necessaryValues.second = (necessaryValues.second >= y ? 1 : necessaryValues.second);
-		
-		if(necessaryValues.first > y){
-		  necessaryValues.first = y;	
-		}
-		
+
+                if (necessaryValues.first > y) {
+                    necessaryValues.first = y;
+                }
+
             } else if (qi < 0) {
                 necessaryValues.first = (necessaryValues.first <= y ? -1 : necessaryValues.first);
-		
-		if(necessaryValues.second < y){
-		  necessaryValues.second = y;	
-		}
-		
-		
+
+                if (necessaryValues.second < y) {
+                    necessaryValues.second = y;
+                }
             }
 
             if (necessaryValues.first <= values[start]) {
@@ -243,19 +255,15 @@ namespace ta {
                 it = std::upper_bound(values.begin() + start, values.begin() + end, necessaryValues.second);
                 necessaryIndices.second = it - values.begin();
             }
-            
-            
+
+
         }
 
     public:
-        col_type colNum;
-        row_type size;
 
-        std::vector<row_type> ids;
 
-        inline IntLists()  = default;
-
-        inline ~IntLists()  = default;
+        inline IntLists() = default;
+        inline ~IntLists() = default;
 
         inline void initializeLists(const VectorMatrix& matrix, ta_size_type start = 0, ta_size_type end = 0) {
             omp_set_lock(&writelock);
@@ -266,7 +274,6 @@ namespace ta {
                 sortedCoord.resize(matrix.colNum);
 
                 colNum = matrix.colNum;
-
 
                 if (start == end) {
                     start = 0;
@@ -280,7 +287,7 @@ namespace ta {
                 for (col_type i = 0; i < colNum; ++i) {
 
                     for (row_type j = start; j < end; ++j) { // scans the matrix as it is, i.e., perhaps in sorted order
-//                        sortedCoord[i].push_back(QueueElement(matrix.getMatrixRowPtr(j)[i], j - start));
+                        //                        sortedCoord[i].push_back(QueueElement(matrix.getMatrixRowPtr(j)[i], j - start));
                         sortedCoord[i].emplace_back(matrix.getMatrixRowPtr(j)[i], j - start);
                         // i is the position of the vector in the matrix, not necessarily the vectorID
                     }
@@ -296,8 +303,8 @@ namespace ta {
             }
             omp_unset_lock(&writelock);
         }
-        
-        inline row_type getRowPointer(row_type row, col_type col) {
+
+        inline row_type getRowPointer(row_type row, col_type col) const {
             return ids[col * size + row];
         }
 
@@ -305,20 +312,20 @@ namespace ta {
             return &ids[pos];
         }
 
-        inline double getValue(row_type row, col_type col) {
+        inline double getValue(row_type row, col_type col) const {
             return values[col * size + row];
         }
 
-        inline col_type getColNum() {
+        inline col_type getColNum() const {
             return colNum;
         }
 
-        inline row_type getRowNum() {
+        inline row_type getRowNum() const {
             return size;
         }
 
         inline bool calculateIntervals(const double* query, const col_type* listsQueue, std::vector<IntervalElement>& intervals,
-                double localTheta, col_type lists) {
+                double localTheta, col_type lists) const {
 
             std::pair<row_type, row_type> necessaryIndices;
 

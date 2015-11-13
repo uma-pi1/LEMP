@@ -55,12 +55,11 @@ namespace ta {
 
         inline Algo_withTuning(LEMPArg& args) : args(args), maxProbeBucketSize(0) {
 
-
             VectorMatrix leftMatrix, rightMatrix;
 
             if (args.querySideLeft) {
                 leftMatrix.readFromFile(args.usersFile, args.r, args.m, true);
-                rightMatrix.readFromFile(args.itemsFile, args.r, args.n,  false);
+                rightMatrix.readFromFile(args.itemsFile, args.r, args.n, false);
             } else {
                 leftMatrix.readFromFile(args.itemsFile, args.r, args.n, false);
                 rightMatrix.readFromFile(args.usersFile, args.r, args.m, true);
@@ -77,6 +76,18 @@ namespace ta {
 
                 std::cout << "Problem with opening log-file. No log-file will be created" << std::endl;
             }
+
+            t.start();
+            omp_set_num_threads(args.threads);
+
+            results.resize(args.threads);
+
+            queryMatrices.resize(args.threads);
+            retrArg.resize(args.threads);
+            row_type maxBlockSize = initProbeBuckets(rightMatrix);
+            initQueryBatches(leftMatrix, maxBlockSize);
+            t.stop();
+            Algo_withTuning::args.dataManipulationTime += t.elapsedTime().nanos();
 
 
             std::cout << "Cache Size (KB) per Processor: " << args.cacheSizeinKB << std::endl;
@@ -118,12 +129,21 @@ namespace ta {
                 case LEMP_AP:
                     logging << "LEMP_AP";
                     std::cout << "ALGO: LEMP_AP" << std::endl;
+                    t.start();
+                    calculateAPneededForQuery(queryMatrices, 0, args.k, cweights);
+                    t.stop();
+                    Algo_withTuning::args.dataManipulationTime += t.elapsedTime().nanos();
                     break;
                 case LEMP_LSH:
                     logging << "LEMP_LSH";
                     std::cout << "ALGO: LEMP_LSH" << std::endl;
                     std::cout << "Max LSH signatures: " << LSH_SIGNATURES << std::endl;
                     std::cout << "Recall rate: " << args.R << std::endl;
+                    t.start();
+                    assert(((double)LSH_CODE_LENGTH) % 8 == 0);
+                    repetitionsForTheta.init(args.R);                    
+                    t.stop();
+                    Algo_withTuning::args.dataManipulationTime += t.elapsedTime().nanos();
                     break;
             }
 
@@ -134,24 +154,9 @@ namespace ta {
             logging << "\t \"" << args.usersFile << "\"" << "\t" << args.threads << "\t";
 
 
-            t.start();
-            omp_set_num_threads(args.threads);
-
-            results.resize(args.threads);
-
-            queryMatrices.resize(args.threads);
-            retrArg.resize(args.threads);
-            row_type maxBlockSize = initProbeBuckets(rightMatrix);
-            initQueryBatches(leftMatrix, maxBlockSize);
 
 
-            if (args.method == LEMP_AP) {
-                double thres = 0;
-                calculateAPneededForQuery(queryMatrices, thres, args.k, cweights);
-            }
 
-            t.stop();
-            Algo_withTuning::args.dataManipulationTime += t.elapsedTime().nanos();
 
         }
 
@@ -162,12 +167,11 @@ namespace ta {
 
             t.start();
             initializeRetrievers();
-            for (auto& argument : retrArg) {
+
+            for (auto& argument : retrArg)
                 argument.init(maxProbeBucketSize);
-            }
 
             initListsInBuckets();
-
 
             t.stop();
             Algo_withTuning::args.dataManipulationTime += t.elapsedTime().nanos();
@@ -188,21 +192,20 @@ namespace ta {
                 case LEMP_C:
                 case LEMP_LC:
 
-                    for (row_type b = 0; b < activeBuckets; ++b) {
-                        if (maxLists < probeBuckets[b].numLists) {
-                            maxLists = probeBuckets[b].numLists;
-                        }
-                    }
-                    for (auto& argument : retrArg) {
+                    std::for_each(probeBuckets.begin(), probeBuckets.begin() + activeBuckets, [&maxLists](const ProbeBucket & b) {
+                        if (maxLists < b.numLists) maxLists = b.numLists;
+                    });
+
+                    for (auto& argument : retrArg)
                         argument.setIntervals(maxLists);
-                    }
 
 
                     break;
             }
-            for (auto& argument : retrArg) {
+
+            for (auto& argument : retrArg)
                 argument.clear();
-            }
+
 
             comp_type comparisons = 0;
 
@@ -271,19 +274,18 @@ namespace ta {
                 case LEMP_C:
                 case LEMP_LC:
 
-                    for (row_type b = 0; b < activeBuckets; ++b) {
-                        if (maxLists < probeBuckets[b].numLists) {
-                            maxLists = probeBuckets[b].numLists;
-                        }
-                    }
-                    for (auto& argument : retrArg) {
+                    std::for_each(probeBuckets.begin(), probeBuckets.begin() + activeBuckets, [&maxLists](const ProbeBucket & b) {
+                        if (maxLists < b.numLists) maxLists = b.numLists;
+                    });
+
+                    for (auto& argument : retrArg)
                         argument.setIntervals(maxLists);
-                    }
+
                     break;
             }
-            for (auto& argument : retrArg) {
+            for (auto& argument : retrArg)
                 argument.clear();
-            }
+
 
             comp_type comparisons = 0;
             double worstMinScore = std::numeric_limits<double>::max();
@@ -295,8 +297,6 @@ namespace ta {
 
 
                 for (row_type b = 0; b < probeBuckets.size(); ++b) {
-
-                    retrArg[tid].bucketInd = b;
 
                     probeBuckets[b].ptrRetriever->runTopK(probeBuckets[b], &retrArg[tid]);
 
@@ -319,9 +319,6 @@ namespace ta {
 
                 localToGlobalIds(retrArg[tid].topkResults, args.k, retrArg[tid].results, queryMatrices[tid]);
                 results[tid] = &retrArg[tid].results;
-
-
-
                 comparisons += retrArg[tid].comparisons;
 
             }
@@ -389,10 +386,10 @@ namespace ta {
         if (args.k == 0) { // Above-theta
             double maxUserLength = 0;
 
-            for (auto& element : queryMatrices) {
-                if (maxUserLength < element.lengthInfo[0].data)
-                    maxUserLength = element.lengthInfo[0].data;
-            }
+            std::for_each(queryMatrices.begin(), queryMatrices.end(),
+                    [&maxUserLength](const VectorMatrix & m) {
+                        if (maxUserLength < m.lengthInfo[0].data) maxUserLength = m.lengthInfo[0].data;
+                    });
 
             for (row_type i = 0; i < probeBuckets.size(); ++i) {
                 probeBuckets[i].bucketScanThreshold = args.theta * probeBuckets[i].invNormL2.second;
@@ -408,10 +405,10 @@ namespace ta {
             }
         } else { // Row-top-k
 
-            for (row_type b = 1; b < probeBuckets.size(); ++b) {
-                if (maxProbeBucketSize < probeBuckets[b].rowNum)
-                    maxProbeBucketSize = probeBuckets[b].rowNum;
-            }
+            std::for_each(probeBuckets.begin() + 1, probeBuckets.end(), [this](const ProbeBucket & b) {
+                if (maxProbeBucketSize < b.rowNum) maxProbeBucketSize = b.rowNum;
+            });
+
             b0 = 1;
             retriever_ptr firstPtr(new Retriever());
             probeBuckets[0].ptrRetriever = firstPtr;
@@ -523,13 +520,11 @@ namespace ta {
         {
             row_type tid = omp_get_thread_num();
             std::vector<row_type> blockOffsets;
-            computeBlockOffsetsForUsersFixed(queryMatrices[tid].lengthInfo, queryMatrices[tid].rowNum, blockOffsets, args.cacheSizeinKB,
-                    queryMatrices[tid].colNum, args, maxBlockSize);
+            computeBlockOffsetsForUsersFixed(queryMatrices[tid].rowNum, blockOffsets, args.cacheSizeinKB, queryMatrices[tid].colNum, args, maxBlockSize);
             bucketize(retrArg[tid].queryBatches, queryMatrices[tid], blockOffsets, args);
 
             nCount += retrArg[tid].queryBatches.size();
-            retrArg[tid].initializeBasics(queryMatrices[tid], probeMatrix, args.method, args.theta, args.k, args.threads, args.R,
-                    args.epsilon, true, args.isTARR);
+            retrArg[tid].initializeBasics(queryMatrices[tid], probeMatrix, args.method, args.theta, args.k, args.threads, args.R, args.epsilon, true, args.isTARR);
 
         }
         logging << nCount << "\t";
@@ -573,10 +568,11 @@ namespace ta {
                 break;
 
             case LEMP_AP:
-                for (auto& element : queryMatrices) {
-                    if (maxQueryLength < element.getVectorLength(0))
-                        maxQueryLength = element.getVectorLength(0);
-                }
+
+                std::for_each(queryMatrices.begin(), queryMatrices.end(),
+                        [&maxQueryLength](const VectorMatrix & m) {
+                            if (maxQueryLength < m.getVectorLength(0)) maxQueryLength = m.getVectorLength(0);
+                        });
 
                 worstCaseTheta = args.theta / maxQueryLength;
 
@@ -594,13 +590,13 @@ namespace ta {
                 for (row_type b = b0; b < activeBuckets; ++b) {
                     static_cast<LshIndex*> (probeBuckets[b].ptrIndexes[LSH])->initializeLists(probeMatrix, true, probeBuckets[b].startPos, probeBuckets[b].endPos);
 
-                    row_type signatures = LSH_SIGNATURES; //LSH_SIGNATURES/(b+1);
-                    if (retrArg.size() > 1 && signatures > 0) {
-                        row_type tid = omp_get_thread_num();
-
-                        static_cast<LshIndex*> (probeBuckets[b].ptrIndexes[LSH])->checkAndReallocateAll(&probeMatrix, true, probeBuckets[b].startPos, probeBuckets[b].endPos, signatures,
-                                retrArg[tid].sums, retrArg[tid].countsOfBlockValues, retrArg[tid].sketches, retrArg[tid].rig);
-                    }
+//                    row_type signatures = LSH_SIGNATURES; //LSH_SIGNATURES/(b+1);
+//                    if (retrArg.size() > 1 && signatures > 0) {
+//                        row_type tid = omp_get_thread_num();
+//
+//                        static_cast<LshIndex*> (probeBuckets[b].ptrIndexes[LSH])->checkAndReallocateAll(&probeMatrix, true, probeBuckets[b].startPos, probeBuckets[b].endPos, signatures,
+//                                retrArg[tid].sums, retrArg[tid].countsOfBlockValues, retrArg[tid].sketches);
+//                    }
                 }
 
                 break;
@@ -627,18 +623,12 @@ namespace ta {
                         t.start();
                         // first set-up the xValues in each retriever
                         for (row_type b = 0; b < activeBuckets; ++b) {
-                            probeBuckets[b].ptrRetriever->sampling(probeBuckets[b], retrArg);
+                            probeBuckets[b].sampling(retrArg);
                         }
 
                         // then do the actual tuning
                         for (row_type b = 0; b < activeBuckets; ++b) {
-
-                            retrArg[0].bucketInd = b;
-                            probeBuckets[b].ptrRetriever->tune(probeBuckets[b], retrArg);
-
-                            if (probeBuckets[b].ptrRetriever->xValues->size() == 0) {
-                                probeBuckets[b].setAfterTuning(probeBuckets[b - 1].numLists, probeBuckets[b - 1].t_b);
-                            }
+                            probeBuckets[b].ptrRetriever->tune(probeBuckets[b], (b == 0 ? probeBuckets[b] : probeBuckets[b - 1]), retrArg);
                         }
 
                         t.stop();
@@ -650,11 +640,11 @@ namespace ta {
 
                         p = findSampleForTuningTopk(probeBuckets, retrArg);
 
+
                         activeBuckets = p.first;
 #pragma omp parallel for schedule(dynamic,1) 
                         for (row_type b = 1; b < activeBuckets; ++b) {
-                            retrArg[0].bucketInd = b;
-                            probeBuckets[b].ptrRetriever->setup_xValues_topk(probeBuckets[b], retrArg);
+                            probeBuckets[b].setup_xValues_topk(retrArg, probeBuckets[b - 1].sampleThetas);
                         }
 
                         t.stop();
@@ -668,20 +658,9 @@ namespace ta {
                         args.dataManipulationTime += t.elapsedTime().nanos();
 
                         t.start();
+
                         for (row_type b = 1; b < probeBuckets.size(); ++b) {
-                            retrArg[0].bucketInd = b;
-
-                            if (b < activeBuckets) {
-                                probeBuckets[b].ptrRetriever->tuneTopk(probeBuckets[b], retrArg);
-
-                                //                                std::cout << b << "-->" << probeBuckets[b].t_b << " " << (int) probeBuckets[b].numLists << std::endl;
-
-
-                            } else {
-                                probeBuckets[b].setAfterTuning(probeBuckets[b - 1].numLists, probeBuckets[b - 1].t_b);
-                            }
-
-                            //                            probeBuckets[b].setAfterTuning(1, -1);
+                            probeBuckets[b].ptrRetriever->tuneTopk(probeBuckets[b], probeBuckets[b - 1], retrArg);
                         }
 
                         t.stop();

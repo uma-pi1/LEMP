@@ -30,9 +30,7 @@ namespace ta {
     std::pair<row_type, row_type> findSampleForTuningTopk(std::vector<ProbeBucket>& probeBuckets, std::vector<RetrievalArguments>& retrArg) {
         row_type activeBuckets = 0, bucketsForInit = 0;
 
-        // 1: Bucket 2: valid sample points for bucket
-        retrArg[0].globalData.resize(probeBuckets.size());
-        row_type id;
+
         std::pair<row_type, row_type> p;
 
 
@@ -52,7 +50,9 @@ namespace ta {
         rg::Random32& random = retrArg[0].random;
 
 
-        retrArg[0].globalData[0].resize(retrArg.size());
+        for (auto& b : probeBuckets)
+            b.sampleThetas.resize(retrArg.size());
+
         retrArg[0].heap.resize(retrArg[0].k);
 
 
@@ -69,32 +69,34 @@ namespace ta {
 
                 // I will need to keep track of the topk results of each query for each bucket. The kth value in the topk list will give me the theta_b(q))
                 // that corresponds to this query
-                // I keep this info in the retrArg because it will be needed later in the ListsTuneData.h
-                retrArg[0].globalData[0][t][id] = GlobalTopkTuneData();
+                // I keep this info in the retrArg because it will be needed later in the ListsTuneData.h                
+                probeBuckets[0].sampleThetas[t][id] = GlobalTopkTuneData();
 
 
                 for (row_type j = probeBuckets[0].startPos; j < probeBuckets[0].endPos; ++j) {
                     double ip = retrArg[0].probeMatrix->innerProduct(j, query);
-                    retrArg[0].globalData[0][t][id].results.emplace_back(ip, retrArg[0].probeMatrix->getId(j));
+                    probeBuckets[0].sampleThetas[t][id].results.emplace_back(ip, retrArg[0].probeMatrix->getId(j));
                 }
 
                 // and now make the heap
-                std::make_heap(retrArg[0].globalData[0][t][id].results.begin(), retrArg[0].globalData[0][t][id].results.end(), std::greater<QueueElement>()); // non thread safe
+                std::make_heap(probeBuckets[0].sampleThetas[t][id].results.begin(), probeBuckets[0].sampleThetas[t][id].results.end(), std::greater<QueueElement>()); // non thread safe
 
                 for (row_type b = 1; b < probeBuckets.size(); ++b) {
 
-                    std::vector<QueueElement>& prevResults = retrArg[0].globalData[b - 1][t][id].results;
+
+                    std::vector<QueueElement>& prevResults = probeBuckets[b - 1].sampleThetas[t][id].results;
+
 
                     if (prevResults.front().data >= probeBuckets[b].normL2.second) { // bucket check
                         break;
 
                     } else {// run LENGTH and measure the time
 
-                        if (retrArg[0].globalData[b].size() == 0) {
-                            retrArg[0].globalData[b].resize(retrArg.size());
+                        if (probeBuckets[b].sampleThetas.size() == 0) {
+                            probeBuckets[b].sampleThetas.resize(retrArg.size());
                         }
 
-                        retrArg[0].globalData[b][t][id] = GlobalTopkTuneData();
+                        probeBuckets[b].sampleThetas[t][id] = GlobalTopkTuneData();
 
                         std::copy(prevResults.begin(), prevResults.end(), retrArg[0].heap.begin());
                         std::make_heap(retrArg[0].heap.begin(), retrArg[0].heap.end(), std::greater<QueueElement>());
@@ -102,10 +104,10 @@ namespace ta {
                         retrArg[0].tunerTimer.start();
                         plainRetriever.runTopK(query, probeBuckets[b], &retrArg[0]);
                         retrArg[0].tunerTimer.stop();
-                        retrArg[0].globalData[b][t][id].lengthTime = retrArg[0].tunerTimer.elapsedTime().nanos();
+                        probeBuckets[b].sampleThetas[t][id].lengthTime = retrArg[0].tunerTimer.elapsedTime().nanos();
 
-                        retrArg[0].globalData[b][t][id].results.reserve(retrArg[0].k);
-                        std::copy_n(retrArg[0].heap.begin(), retrArg[0].k, std::back_inserter(retrArg[0].globalData[b][t][id].results));
+                        probeBuckets[b].sampleThetas[t][id].results.reserve(retrArg[0].k);
+                        std::copy_n(retrArg[0].heap.begin(), retrArg[0].k, std::back_inserter(probeBuckets[b].sampleThetas[t][id].results));
 
                         if (b > bucketsForInit)
                             bucketsForInit = b;
@@ -120,7 +122,7 @@ namespace ta {
             row_type counter = 0;
 
             for (int t = 0; t < retrArg.size(); ++t) {
-                counter += retrArg[0].globalData[b][t].size();
+                counter += probeBuckets[b].sampleThetas[t].size();
             }
 
             if (counter >= LOWER_LIMIT_PER_BUCKET) {
@@ -130,8 +132,15 @@ namespace ta {
             }
 
         }
-        activeBuckets++;
+        activeBuckets++;        
         bucketsForInit++;
+        
+        
+        for (row_type b = activeBuckets; b < probeBuckets.size(); ++b) {
+            if (probeBuckets[b].xValues != nullptr)
+                probeBuckets[b].xValues->clear();
+            probeBuckets[b].sampleThetas.clear();
+        }
 
 
         p.first = activeBuckets; // I will try to tune t_b, phi for all these buckets

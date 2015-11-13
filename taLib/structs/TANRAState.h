@@ -23,8 +23,8 @@
 
 namespace ta {
 
-    struct TANRAState {
-        // fields for the 1-sided version
+    class TANRAState {
+    protected:
         const double* query;
         QueueElementLists* invLists;
 
@@ -35,13 +35,17 @@ namespace ta {
         std::vector<long> fringePos;
         col_type inactiveCols;
 
-        /*
-         * this is for the scheduler
-         */
-        maxHeap piqi;
+    public:
 
         TANRAState(col_type colNum) : colNum(colNum), invLists(0) {
             fringePos.resize(colNum);
+        }
+
+        virtual ~TANRAState() {
+        }
+
+        inline long getDepthInFringeInCol(col_type col) {
+            return fringePos[col];
         }
 
         inline void initializeForNewBucket(QueueElementLists* m1) {// first initialization
@@ -49,26 +53,9 @@ namespace ta {
             rowNum = m1->getRowNum();
         }
 
-        inline void initForNewQuery(const double* q) {// initialize to specific rows
-
+        inline virtual void initForNewQuery(const double* q) {// initialize to specific rows
             inactiveCols = 0;
-            worstScores.erase(worstScores.begin(), worstScores.end());
-
             query = q;
-            piqi.clear();
-            double value;
-
-
-            for (col_type i = 0; i < colNum; i++) {
-                if (query[i] < 0) { //scan downwards///////////////////////
-                    fringePos[i] = i * invLists->size + 0;
-
-                } else {
-                    fringePos[i] = i * invLists->size + rowNum - 1;
-                }
-                value = invLists->getElement(fringePos[i])->data * query[i];
-                piqi.add(QueueElement(value, i));
-            }
         }
 
         /*
@@ -81,7 +68,7 @@ namespace ta {
             worstScores[key].second.push_back(stepOnCol);
         }
 
-        inline void getCandidates(std::vector<row_type>& candidatesToVerify, row_type& numCandidatesToVerify, double localTheta, double stopThreshold) {
+        inline void getCandidates(row_type* candidatesToVerify, row_type& numCandidatesToVerify, double localTheta, double stopThreshold) {
             unordered_map<row_type, std::pair<double, std::vector<col_type> > >::iterator it;
 
             for (it = worstScores.begin(); it != worstScores.end(); it++) {
@@ -105,10 +92,106 @@ namespace ta {
                     numCandidatesToVerify++;
                 }
             }
+            worstScores.erase(worstScores.begin(), worstScores.end());
+        }
+
+        inline virtual void updateState(col_type col) {// given that the step happened on col update the structures
+
+            if (query[col] < 0) {//scan downwards //////////////////
+
+                fringePos[col]++;
+                if (fringePos[col] >= (col + 1) * invLists->getRowNum()) {
+                    inactiveCols++;
+                }
+
+            } else {//scan upwards
+
+                // keep moving upwards
+                fringePos[col]--;
+                if (fringePos[col] < col * invLists->getRowNum()) {
+                    inactiveCols++;
+                }
+            }
 
         }
 
-        inline void updateState(col_type col) {// given that the step happened on col update the structures
+
+
+        ///////////////// methods for threshold update ////////////////////////
+
+        inline double getInitialThreshold() {
+            double stopThreshold = 0;
+            for (col_type i = 0; i < colNum; i++) {
+                stopThreshold += invLists->getElement(fringePos[i])->data * query[i];
+            }
+            return stopThreshold;
+        }
+
+
+        inline bool isThresholdUnterTheta(double& stopThreshold, double localTheta, col_type stepOnCol, double oldValue, bool forCosine) {
+
+            if (colNum <= inactiveCols) {
+                return true;
+            }
+            double piNew = invLists->getElement(fringePos[stepOnCol])->data;
+
+            if (piNew == oldValue)
+                return false;
+
+            //updateThreshold
+            stopThreshold += query[stepOnCol] * (piNew - oldValue);
+
+
+            if (stopThreshold < localTheta) {
+                return true;
+            }
+
+            return false;
+        }
+
+        inline virtual col_type chooseStep() {
+            std::cerr << "Error! You shouldn't have called that" << std::endl;
+            exit(1);
+        }
+   
+
+
+    };
+
+    class TANRAStateMax : public TANRAState {
+        maxHeap piqi;
+
+
+
+    public:
+
+        TANRAStateMax(col_type colNum) : TANRAState(colNum) {
+        }
+
+        virtual ~TANRAStateMax() {
+        }
+
+        inline void initForNewQuery(const double* q) {// initialize to specific rows
+
+            TANRAState::initForNewQuery(q);
+
+            double value;
+            
+            
+
+            for (col_type i = 0; i < colNum; i++) {
+                if (query[i] < 0) { //scan downwards///////////////////////
+                    fringePos[i] = i * invLists->getRowNum() + 0;
+
+                } else {
+                    fringePos[i] = i * invLists->getRowNum() + rowNum - 1;
+                }
+                value = invLists->getElement(fringePos[i])->data * query[i];
+                piqi.add(QueueElement(value, i));
+            }
+        }
+
+        inline virtual void updateState(col_type col) {// given that the step happened on col update the structures
 
             row_type rowId;
             bool inactivate = false;
@@ -116,7 +199,7 @@ namespace ta {
             if (query[col] < 0) {//scan downwards //////////////////
 
                 fringePos[col]++;
-                if (fringePos[col] == (col + 1) * invLists->size) {
+                if (fringePos[col] == (col + 1) * invLists->getRowNum()) {
                     inactivate = true;
                 } else {
                     rowId = invLists->getElement(fringePos[col])->id;
@@ -126,7 +209,7 @@ namespace ta {
 
                 // keep moving upwards
                 fringePos[col]--;
-                if (fringePos[col] < col * invLists->size) {
+                if (fringePos[col] < col * invLists->getRowNum()) {
                     inactivate = true;
                 } else {
                     rowId = invLists->getElement(fringePos[col])->id;
@@ -141,46 +224,59 @@ namespace ta {
             }
         }
 
-   
-
-        ///////////////// methods for threshold update ////////////////////////
-
-        inline double initializeThreshold() {
-            double stopThreshold = 0;
-            for (col_type i = 0; i < colNum; i++) {
-                stopThreshold += invLists->getElement(fringePos[i])->data * query[i];
-            }
-            return stopThreshold;
-        }
-
-        inline void updateThreshold(double& stopThreshold, col_type stepOnCol, double oldValue) {
-            double queryPart = query[stepOnCol];
-            double piNew = invLists->getElement(fringePos[stepOnCol])->data;
-            stopThreshold += queryPart * (piNew - oldValue);
-        }
-
-        inline bool isThresholdUnterTheta(double& stopThreshold, double localTheta, col_type stepOnCol, double oldValue, bool forCosine) {
-            if (colNum <= inactiveCols) {
-                return true;
-            }
-
-            updateThreshold(stopThreshold, stepOnCol, oldValue);
-
-            if (stopThreshold < localTheta) {
-                return true;
-            }
-            return false;
-        }
 
         ///////////////// methods for choosing next step ////////////////////////
 
-        inline col_type chooseStepGreatestPiQi() {
+        inline col_type chooseStep() {
             col_type stepOnCol = piqi.getMaxId();
             return stepOnCol;
         }
+        ////////////////////////////////////////
 
-        inline col_type chooseStep() {
-            col_type stepOnCol = chooseStepGreatestPiQi();
+
+    };
+
+    class TANRAStateRR : public TANRAState {
+        std::vector<col_type> activeCols;
+        col_type colIndx;
+
+    public:
+
+        TANRAStateRR(col_type colNum) : TANRAState(colNum) {
+        }
+
+        virtual ~TANRAStateRR() {
+        }
+
+        inline virtual void initForNewQuery(const double* q) {// initialize to specific rows
+
+            TANRAState::initForNewQuery(q);
+            activeCols.clear();
+            colIndx = 0;
+
+            for (col_type i = 0; i < colNum; i++) {
+                if (query[i] < 0) { //scan downwards///////////////////////
+                    fringePos[i] = i * invLists->getRowNum() + 0;
+                } else {
+                    fringePos[i] = i * invLists->getRowNum() + rowNum - 1;
+                }
+                if (query[i] != 0) {
+                    activeCols.push_back(i);
+                }
+            }
+        }
+
+        using TANRAState::updateState;
+
+        ///////////////// methods for choosing next step ////////////////////////
+
+        inline virtual col_type chooseStep() {
+                      
+            if (colIndx == activeCols.size())
+                colIndx = 0;
+
+            col_type stepOnCol = activeCols[colIndx];
+            colIndx++;
             return stepOnCol;
         }
         ////////////////////////////////////////

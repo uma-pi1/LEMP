@@ -25,15 +25,17 @@ int main() {
     LEMPArg args;
     args.k = 10;
     args.R = 0.9;
+    args.isTransformed = false;
 
+//    args.usersFile = "/home/chteflio/chteflioInMPI/data/ta-data/w50-net-srebro-noav.mma";
+//    args.itemsFile = "/home/chteflio/chteflioInMPI/data/ta-data/h50-net-srebro-noav.mma";
 
-
-    args.usersFile = "/home/chteflio/chteflioInMPI/data/ta-data/w-net-srebro.mma";
-    args.itemsFile = "/home/chteflio/chteflioInMPI/data/ta-data/h-net-srebro.mma";
+    args.usersFile = "/home/chteflio/chteflioInMPI/data/ta-data/w50-net-noav.mma";
+    args.itemsFile = "/home/chteflio/chteflioInMPI/data/ta-data/h50-net-noav.mma";
 
 
     args.logFile = "/home/chteflio/workspace/Log.txt";
-
+//    args.resultsFile="/home/chteflio/data/test1.data";
 
 
     ta::SimpleLSH algo(args);

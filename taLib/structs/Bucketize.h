@@ -29,9 +29,8 @@ namespace ta {
     /*
      * cacheSizeInKB : per processor
      */
-    inline row_type computeBlockOffsetsByFactorCacheFittingForItems(std::vector<QueueElement>& elements, row_type size,
-            std::vector<row_type>& blockOffsets, double factor, row_type minItems,
-            row_type cacheSizeInKB, row_type rank, LEMPArg& args) {
+    inline row_type computeBlockOffsetsByFactorCacheFittingForItems(const std::vector<QueueElement>& elements, row_type size,
+            std::vector<row_type>& blockOffsets, double factor, row_type minItems, row_type cacheSizeInKB, row_type rank, const LEMPArg& args) {
 
         int doubleSize = 8; //bytes
         int row_typeSize = sizeof(row_type);
@@ -138,8 +137,8 @@ namespace ta {
     /*
      * cacheSizeInKB : per processor
      */
-    inline void computeBlockOffsetsForUsersFixed(std::vector<QueueElement>& elements, row_type size, std::vector<row_type>& blockOffsets,
-            row_type cacheSizeInKB, row_type rank, LEMPArg& args, row_type maxBlockSize) {
+    inline void computeBlockOffsetsForUsersFixed( row_type size, std::vector<row_type>& blockOffsets, 
+            row_type cacheSizeInKB, row_type rank, const LEMPArg& args, row_type maxBlockSize) {
 
         int doubleSize = 8; //bytes
         int row_typeSize = sizeof(row_type);
@@ -179,7 +178,7 @@ namespace ta {
     }
 
     template<typename T>
-    inline void bucketize(std::vector<T>& buckets, VectorMatrix& matrix, std::vector<row_type>& blockOffsets, LEMPArg& args) {
+    inline void bucketize(std::vector<T>& buckets, const VectorMatrix& matrix,  const std::vector<row_type>& blockOffsets, const LEMPArg& args) {
 
         row_type start, end;
         buckets.clear();
@@ -190,7 +189,6 @@ namespace ta {
             end = (i == (blockOffsets.size() - 1) ? matrix.rowNum : blockOffsets[i + 1]);
             buckets[i].init(matrix, start, end, args);
         }
-
     }
 
 

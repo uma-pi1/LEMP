@@ -32,10 +32,14 @@ int main() {
     //	args.theta = 0.035;
     args.k = 5;
     args.querySideLeft = false;
-    args.threads = 2;
+    args.threads = 1;
+    args.isTARR = true;
 
-    args.usersFile = "/home/chteflio/data/ta-data/w-50-gnmf-zero.mma";
-    args.itemsFile = "/home/chteflio/data/ta-data/h-50-gnmf-zero.mma";
+    //    args.usersFile = "/home/chteflio/data/ta-data/w-50-gnmf-zero.mma";
+    //    args.itemsFile = "/home/chteflio/data/ta-data/h-50-gnmf-zero.mma";
+
+    args.usersFile = "/home/chteflio/chteflioInMPI/data/ta-data/w-gnmf-sample.mma";
+    args.itemsFile = "/home/chteflio/chteflioInMPI/data/ta-data/h-gnmf-sample.mma";
 
     args.logFile = "/home/chteflio/workspace/Log.txt";
 

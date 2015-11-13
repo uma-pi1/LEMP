@@ -16,14 +16,6 @@ namespace ta {
 
     typedef boost::shared_ptr< std::vector<MatItem> > xValues_ptr; // data: localTheta i: thread j: posInMatrix
 
-    struct GlobalTopkTuneData {
-        double lengthTime;
-        std::vector<QueueElement> results;
-
-        GlobalTopkTuneData() : lengthTime(0) {
-        }
-    };
-
     struct RetrievalArguments {
         std::vector<IntervalElement> intervals;
         std::vector<MatItem > results;
@@ -39,7 +31,7 @@ namespace ta {
         row_type* cp_array; // for coord
         Candidate_incr* ext_cp_array; // for icoord
 
-        std::vector<QueryBucket_withTuning> queryBatches;
+        std::vector<QueryBatch> queryBatches;
 
         std::vector<double> accum, hashval; // for L2AP
         double* hashlen; // for L2AP
@@ -47,11 +39,9 @@ namespace ta {
 
         // for tuning
         std::vector<double>* competitorMethod;
-        std::vector< std::vector< unordered_map< row_type, GlobalTopkTuneData > > > globalData; // 1: Bucket 2: thread 3: valid sample points for bucket -->result
 
-        std::vector<QueueElement> thetaForActiveBlocks; // for LSH
+
         uint8_t* sketches; //for LSH no need to keep the actual sketches for the probe vectors. just keep the buckets with the ids
-        RandomIntGaussians* rig;
 
         VectorMatrix* probeMatrix;
         VectorMatrix* queryMatrix;
@@ -65,18 +55,16 @@ namespace ta {
         rg::Random32 random;
 
         int threads, k;
-        int prevBucketBestPhi; // to be used during tuning
-
 
         double theta, t_b, R, epsilon, currEpsilonAppr; // for ICOORD or COORD
         double worstMinScore; // for L2AP
         double boundsTime, ipTime, scanTime, preprocessTime, filterTime, initializeListsTime, lengthTime;
 
-        comp_type comparisons;
+        mutable comp_type comparisons; // pass  RetrievalArguments as const argument in a function, but still get the comparisons modified 
 
         LEMP_Method method;
 
-        row_type queryId, bucketInd;
+        row_type queryId;
         row_type queryPos; //for Tree
 
         col_type colnum, maxLists, numLists;
@@ -93,8 +81,8 @@ namespace ta {
                 bool forCosine = true, bool isTARR = false) :
         colnum(colnum), comparisons(0), probeMatrix(probeMatrix), queryMatrix(queryMatrix), forCosine(forCosine), method(method),
         boundsTime(0), ipTime(0), scanTime(0), preprocessTime(0), filterTime(0), initializeListsTime(0), lengthTime(0), state(nullptr), tanraState(nullptr),
-        prevBucketBestPhi(-1), threads(1), worstMinScore(std::numeric_limits<double>::max()), hashwgt(nullptr), hashlen(nullptr),
-        competitorMethod(nullptr), sketches(nullptr), rig(nullptr), isTARR(isTARR), cp_array(nullptr), ext_cp_array(nullptr), candidatesToVerify(nullptr) {
+        threads(1), worstMinScore(std::numeric_limits<double>::max()), hashwgt(nullptr), hashlen(nullptr),
+        competitorMethod(nullptr), sketches(nullptr), isTARR(isTARR), cp_array(nullptr), ext_cp_array(nullptr), candidatesToVerify(nullptr) {
             random = rg::Random32(123); // PSEUDO-RANDOM
         }
 
@@ -140,9 +128,6 @@ namespace ta {
                 delete[] hashwgt;
             if (sketches != nullptr)
                 delete[] sketches;
-            if (rig != nullptr)
-                delete rig;
-
         }
 
         inline void clear() {
@@ -165,37 +150,6 @@ namespace ta {
         inline void writeHeapToTopk(row_type queryPos) {
             row_type p = queryPos*k;
             std::copy(heap.begin(), heap.end(), topkResults.begin() + p);
-        }
-
-        inline void initThetaForActiveBlocks() {
-            thetaForActiveBlocks.reserve(LSH_SIGNATURES);
-            double logNom = log(1 - R);
-            double exponent = 1 / ((double) LSH_CODE_LENGTH); //0.125; // 1/8 LSH_CODE_LENGTH
-
-            for (int b = 0; b < LSH_SIGNATURES; ++b) {
-                double logDenom = logNom / (b + 1);
-                double denom = exp(logDenom);
-                double thres8 = 1 - denom;
-                double thres = pow(thres8, exponent);
-                double acosThres = (1 - thres) * PI;
-                double theta = cos(acosThres);
-
-                thetaForActiveBlocks.emplace_back(theta, b + 1);
-            }
-            std::sort(thetaForActiveBlocks.begin(), thetaForActiveBlocks.end(), std::less<QueueElement>());
-        }
-
-        inline int findActiveBlocks(double theta) {
-            auto it = std::upper_bound(thetaForActiveBlocks.begin(), thetaForActiveBlocks.end(), QueueElement(theta, 0));
-
-            int pos = it - thetaForActiveBlocks.begin();
-            if (pos >= thetaForActiveBlocks.size()) {
-                pos = thetaForActiveBlocks.size() - 1;
-                return thetaForActiveBlocks[pos].id;
-            }
-
-            int b = thetaForActiveBlocks[pos].id + 1;
-            return b;
         }
 
         inline void init(row_type maxProbeBucketSize) {
@@ -229,22 +183,25 @@ namespace ta {
                     state = new TAStateRR(colnum);
                 } else {
                     state = new TAStateMAX(colnum);
-                }
+                }                
             }
 
             if (method == LEMP_TANRA) {
                 tanraState = new TANRAState(colnum);
+
+                if (isTARR) {
+                    tanraState = new TANRAStateRR(colnum);
+                } else {
+                    tanraState = new TANRAStateMax(colnum);
+                }
+
                 candidatesToVerify = new row_type[maxProbeBucketSize];
             }
 
             if (method == LEMP_LSH) {
-                rig = new RandomIntGaussians(colnum, LSH_SIGNATURES * LSH_CODE_LENGTH);
                 done.resize(maxProbeBucketSize);
-
-                initThetaForActiveBlocks();
                 long long totalSketchSize = ((long) maxProbeBucketSize) * (LSH_CODE_LENGTH / 8) * ((long) LSH_SIGNATURES);
                 sketches = new uint8_t[totalSketchSize]();
-
                 sums.resize(LSH_SIGNATURES * LSH_CODE_LENGTH, 0);
                 if (LSH_CODE_LENGTH == 8)
                     countsOfBlockValues.resize(256, 0);

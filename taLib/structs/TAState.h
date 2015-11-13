@@ -22,26 +22,39 @@
 #ifndef TASTATE_H_
 #define TASTATE_H_
 
-#include "Lists.h"
+
 
 
 namespace ta {
 
-    class TAState {        
-        
-    public:
+    class TAState {
+    protected:
         const double* query;
         QueueElementLists* invLists;
-        boost::dynamic_bitset<> exploredItems; 
+        boost::dynamic_bitset<> exploredItems;
         col_type colNum;
         row_type rowNum;
         std::vector<long> fringePos;
         bool allSeen; // true if you should stop scanning
 
+    public:
+
+        inline bool isExplored(row_type id) const {
+            return exploredItems[id];
+        }
+
+        inline bool areAllSeen() const {
+            return allSeen;
+        }
+
+        inline long getDepthInFringeInCol(col_type col) const {
+            return fringePos[col];
+        }
 
         TAState(col_type colNum) : colNum(colNum), invLists(nullptr) {
             fringePos.resize(colNum);
         }
+        virtual ~TAState(){}
 
         ///////////////// virtual methods ////////////////////////
 
@@ -53,7 +66,7 @@ namespace ta {
 
         /*
          * given that the step happened on col update the structures
-         * returns the value of the next non-explored entry in this column
+         * 
          */
         inline virtual void updateState(col_type col) {
             if (!allSeen) {
@@ -63,7 +76,7 @@ namespace ta {
                     // keep moving downwards
                     do {
                         fringePos[col]++;
-                        if (fringePos[col] == (col + 1) * invLists->size) {
+                        if (fringePos[col] == (col + 1) * invLists->getRowNum()) {
                             allSeen = true;
                             break;
                         }
@@ -74,7 +87,7 @@ namespace ta {
                     // keep moving upwards
                     do {
                         fringePos[col]--;
-                        if (fringePos[col] < col * invLists->size) {
+                        if (fringePos[col] < col * invLists->getRowNum()) {
                             allSeen = true;
                             break;
                         }
@@ -85,7 +98,7 @@ namespace ta {
         }
 
         inline virtual col_type chooseStep() {
-            std::cerr << "Error! You shouldn't have called that" << std::endl;
+            std::cerr << "Error! You shouldn't have called that 111" << std::endl;
             exit(1);
         }
 
@@ -97,7 +110,7 @@ namespace ta {
             exploredItems.resize(rowNum);
         }
 
-        inline double initializeThreshold() {
+        inline double getInitialThreshold() const {
             double stopThreshold = 0;
 
             for (col_type i = 0; i < colNum; ++i) {
@@ -107,7 +120,7 @@ namespace ta {
             return stopThreshold;
         }
 
-        inline bool isThresholdUnterTheta(double& stopThreshold, double localTheta, col_type stepOnCol, double oldValue, bool forCosine) {
+        inline bool isThresholdUnterTheta(double& stopThreshold, double localTheta, col_type stepOnCol, double oldValue, bool forCosine) const {
             double piNew = invLists->getElement(fringePos[stepOnCol])->data;
 
             stopThreshold += query[stepOnCol] * (piNew - oldValue);
@@ -130,15 +143,16 @@ namespace ta {
     };
 
     class TAStateMAX : public TAState {
-    public:
-
         /*
          * this is for the scheduler
          */
         maxHeap piqi;
+    public:
 
         TAStateMAX(col_type colNum) : TAState(colNum) {
         };
+        
+        virtual ~TAStateMAX(){}
 
         inline void initForNewQuery(const double* q) {// initialize to specific rows
             TAState::initForNewQuery(q);
@@ -146,19 +160,16 @@ namespace ta {
 
             for (col_type i = 0; i < colNum; ++i) {
                 if (query[i] < 0) { //scan downwards///////////////////////
-                    fringePos[i] = i * invLists->size + 0;
+                    fringePos[i] = i * invLists->getRowNum() + 0;
                 } else {
-                    fringePos[i] = i * invLists->size + rowNum - 1;
+                    fringePos[i] = i * invLists->getRowNum() + rowNum - 1;
                 }
                 if (query[i] != 0)
                     piqi.add(QueueElement(invLists->getElement(fringePos[i])->data * query[i], i));
             }
         }
 
-        /*
-         * given that the step happened on col update the structures
-         * returns the value of the next non-explored entry in this column
-         */
+
         inline void updateState(col_type col) {
             TAState::updateState(col);
             if (!allSeen) {// update the front item                                
@@ -174,27 +185,29 @@ namespace ta {
     };
 
     class TAStateRR : public TAState {
-    public:
-
         /*
          * this is for the scheduler
          */
         std::vector<col_type> activeCols;
         col_type colIndx;
 
+    public:
+
         TAStateRR(col_type colNum) : TAState(colNum), colIndx(0) {
         };
+        
+        virtual ~TAStateRR(){}
 
         inline void initForNewQuery(const double* q) {// initialize to specific rows
             TAState::initForNewQuery(q);
-            colIndx = 0;            
+            colIndx = 0;
             activeCols.clear();
 
             for (col_type i = 0; i < colNum; ++i) {
                 if (query[i] < 0) { //scan downwards///////////////////////
-                    fringePos[i] = i * invLists->size + 0;
+                    fringePos[i] = i * invLists->getRowNum() + 0;
                 } else {
-                    fringePos[i] = i * invLists->size + rowNum - 1;
+                    fringePos[i] = i * invLists->getRowNum() + rowNum - 1;
                 }
                 if (query[i] != 0) {
                     activeCols.push_back(i);
@@ -202,15 +215,9 @@ namespace ta {
             }
         }
 
-        /*
-         * given that the step happened on col update the structures
-         * returns the value of the next non-explored entry in this column
-         */
-        inline void updateState(col_type col) {
-            TAState::updateState(col);
-        }
+        using TAState::updateState;
 
-        inline col_type chooseStep() {
+        inline virtual col_type chooseStep() {
             if (colIndx == activeCols.size())
                 colIndx = 0;
 

@@ -53,7 +53,7 @@ namespace ta {
             probeMatrix.init(rightMatrix, false, false);
 
 
-            //            queryMatrix.initForTopKPerUser(leftMatrix); // just to check
+            //                        queryMatrix.init(leftMatrix, false, true); // just to check
             //            probeMatrix.init(rightMatrix, true, true); // just to check
             //                        probeMatrix.init(rightMatrix, true, false); // just to check
 
@@ -169,8 +169,8 @@ namespace ta {
             }
         }
 
-    };
-
+    };    
+    
 }
 
 

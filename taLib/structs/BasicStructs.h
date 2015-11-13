@@ -46,7 +46,6 @@ namespace ta {
 
     comp_type scanned = 0;
 
-
     struct MatItem {
         double result;
         ta_size_type i;
@@ -54,6 +53,7 @@ namespace ta {
 
         inline ~MatItem() = default;
         inline MatItem() = default;
+
         inline MatItem(double result, ta_size_type i, ta_size_type j) : result(result), i(i), j(j) {
         };
 
@@ -96,7 +96,6 @@ namespace ta {
             return !operator<(other);
         }
     };
-
 
     inline std::ostream & operator<<(std::ostream & os, const MatItem & v) {
         os << "(" << v.result << "  [" << v.i << ", " << v.j << "])";
@@ -145,9 +144,6 @@ namespace ta {
 
 
     };
-
-
-    //std::ostream & operator<<(std::ostream & os, const QueueElement & v);
 
     inline std::ostream & operator<<(std::ostream & os, const QueueElement & v) {
         os << "(" << v.data << ", " << v.id << ")";
@@ -207,7 +203,7 @@ namespace ta {
             if (largest != i) {
                 exchange(i, largest);
                 heapify(largest);
-            } 
+            }
         }
 
     public:
@@ -229,7 +225,7 @@ namespace ta {
             return heap[0].data;
         }
 
-        inline ta_size_type getMaxId() {
+        inline ta_size_type getMaxId() const {
             return heap[0].id;
         }
 
@@ -250,12 +246,10 @@ namespace ta {
                 i = parent(i);
             }
             heap[i] = key;
-	    size = heap.size();
+            size = heap.size();
             return true;
         }
     };
-
-
 
     struct IntervalElement {
         row_type start;
@@ -284,6 +278,47 @@ namespace ta {
             return end - start >= other.end - other.start;
         }
     };
+
+    
+    
+    /* These functions are needed for the tuning part
+    */
+    inline void calculateTimeInCutoff(const std::vector<double>& method1, const std::vector<double>& method2, row_type cutoffSample, double& time) {
+        if (cutoffSample == 0) {
+            time = 0;
+            for (auto& element : method1)
+                time += element;
+
+        } else {
+            time -= method1[cutoffSample - 1];
+            time += method2[cutoffSample - 1]; // other can be LENGTH for example
+        }
+    }
+
+    inline void findCutOffPoint(const std::vector<double>& method1, const std::vector<double>& method2, double& bestTime, row_type& best_t_b_ind) {
+        double time;
+        for (row_type i = 0; i < method1.size(); ++i) {
+            calculateTimeInCutoff(method1, method2, i, time);
+
+            if ((i == 0) || bestTime > time) {
+                bestTime = time;
+                best_t_b_ind = i;
+            }
+
+        }
+    }
+
+    inline void findCutOffPointInv(const std::vector<double>& method1, const std::vector<double>& method2, double& bestTime, row_type& best_t_b_ind) {
+        double time = bestTime;
+        for (int i = method1.size() - 1; i >= 0; i--) {
+            time -= method1[i];
+            time += method2[i];
+            if (bestTime > time) {
+                bestTime = time;
+                best_t_b_ind = i;
+            }
+        }
+    }
 
 
 }

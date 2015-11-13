@@ -31,7 +31,7 @@ namespace ta {
         taRetriever() = default;
         ~taRetriever() = default;
 
-        inline virtual void run(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void run(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
 
             QueueElementLists* invLists = static_cast<QueueElementLists*> (probeBucket.getIndex(SL));
 
@@ -51,7 +51,7 @@ namespace ta {
 #endif
             //initialize scheduler and state
             arg->state->initForNewQuery(query);
-            stopThreshold = arg->state->initializeThreshold();
+            stopThreshold = arg->state->getInitialThreshold();
 #ifdef TIME_IT
             arg->t.stop();
             arg->preprocessTime += arg->t.elapsedTime().nanos();
@@ -64,13 +64,14 @@ namespace ta {
                 //choose next step
                 stepOnCol = arg->state->chooseStep();
                 //pick up the item
-                oldValue = invLists->getElement(arg->state->fringePos[stepOnCol])->data;
-                posMatrix = invLists->getElement(arg->state->fringePos[stepOnCol])->id;
+                
+                oldValue = invLists->getElement(arg->state->getDepthInFringeInCol(stepOnCol))->data;
+                posMatrix = invLists->getElement(arg->state->getDepthInFringeInCol(stepOnCol))->id;
 #ifdef TIME_IT
                 arg->t.start();
 #endif
                 //if I haven't explored the item already, do RA
-                if (!arg->state->exploredItems[posMatrix]) {
+                if (!arg->state->isExplored(posMatrix)) {
                     verifyCandidate(posMatrix + probeBucket.startPos, query, arg);
                     countSeen++;
                     arg->state->maintainExploredLists(*(arg->probeMatrix), countSeen, stepOnCol);
@@ -87,7 +88,7 @@ namespace ta {
                 arg->t.stop();
                 arg->scanTime += arg->t.elapsedTime().nanos();
 #endif
-                if (arg->state->allSeen) {
+                if (arg->state->areAllSeen()) {
                     break;
                 }
 
@@ -104,12 +105,12 @@ namespace ta {
 
         }
 
-        inline virtual void run(QueryBucket_withTuning& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void run(QueryBatch& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
             std::cerr << "Error! You shouldn't have called that" << std::endl;
             exit(1);
         }
 
-        inline void runTopK(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline void runTopK(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
 
             col_type stepOnCol = 0;
             row_type posMatrix;
@@ -130,7 +131,7 @@ namespace ta {
             arg->t.start();
 #endif
             arg->state->initForNewQuery(query);
-            double stopThreshold = arg->state->initializeThreshold();
+            double stopThreshold = arg->state->getInitialThreshold();
 #ifdef TIME_IT
             arg->t.stop();
             arg->preprocessTime += arg->t.elapsedTime().nanos();
@@ -142,13 +143,13 @@ namespace ta {
                 //choose next step
                 stepOnCol = arg->state->chooseStep();
                 //pick up the item
-                oldValue = invLists->getElement(arg->state->fringePos[stepOnCol])->data;
-                posMatrix = invLists->getElement(arg->state->fringePos[stepOnCol])->id;
+                oldValue = invLists->getElement(arg->state->getDepthInFringeInCol(stepOnCol))->data;
+                posMatrix = invLists->getElement(arg->state->getDepthInFringeInCol(stepOnCol))->id;
 #ifdef TIME_IT
                 arg->t.start();
 #endif
                 //if I haven't explored the item already, do RA
-                if (!arg->state->exploredItems[posMatrix]) {
+                if (!arg->state->isExplored(posMatrix)) {
                     verifyCandidateTopk(posMatrix + probeBucket.startPos, query, arg);
                     countSeen++;
                     arg->state->maintainExploredLists(*(arg->probeMatrix), countSeen, stepOnCol);
@@ -165,7 +166,7 @@ namespace ta {
                 arg->t.stop();
                 arg->scanTime += arg->t.elapsedTime().nanos();
 #endif
-                if (arg->state->allSeen)
+                if (arg->state->areAllSeen())
                     break;
 #ifdef TIME_IT
                 arg->t.start();
@@ -179,23 +180,25 @@ namespace ta {
             }
         }
 
-        inline virtual void runTopK(QueryBucket_withTuning& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void runTopK(QueryBatch& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
             std::cerr << "Error! You shouldn't have called that" << std::endl;
             exit(1);
         }
 
-        inline virtual void tune(ProbeBucket& probeBucket, std::vector<RetrievalArguments>& retrArg) {
+        inline virtual void tune(ProbeBucket& probeBucket, const ProbeBucket& prevBucket, std::vector<RetrievalArguments>& retrArg) {
 
-            if (xValues->size() > 0) {
-                sampleTimes.resize(xValues->size());
+            row_type sampleSize = probeBucket.xValues->size();
+            
+            if (sampleSize > 0) {
+                sampleTimes.resize(sampleSize);
                 QueueElementLists* invLists = static_cast<QueueElementLists*> (probeBucket.getIndex(SL));
 
                 retrArg[0].state->initializeForNewBucket(invLists);
 
-                for (row_type i = 0; i < xValues->size(); ++i) {
+                for (row_type i = 0; i < sampleSize; ++i) {
 
-                    int t = xValues->at(i).i;
-                    int ind = xValues->at(i).j;
+                    int t = probeBucket.xValues->at(i).i;
+                    int ind = probeBucket.xValues->at(i).j;
                     const double* query = retrArg[t].queryMatrix->getMatrixRowPtr(ind);
 
                     retrArg[0].tunerTimer.start();
@@ -204,30 +207,32 @@ namespace ta {
                     sampleTimes[i] = retrArg[0].tunerTimer.elapsedTime().nanos();
                 }
 
+            } else {
+                probeBucket.setAfterTuning(prevBucket.numLists, prevBucket.t_b);
             }
 
 
         }
 
-        inline virtual void tuneTopk(ProbeBucket& probeBucket, std::vector<RetrievalArguments>& retrArg) {
+        inline virtual void tuneTopk(ProbeBucket& probeBucket, const ProbeBucket& prevBucket, std::vector<RetrievalArguments>& retrArg) {
 
-            row_type b = retrArg[0].bucketInd;
+            row_type sampleSize = (probeBucket.xValues!=nullptr ? probeBucket.xValues->size() : 0);
 
-            if (xValues->size() > 0) {
-                sampleTimes.resize(xValues->size());
+            if (sampleSize > 0) {
+                sampleTimes.resize(sampleSize);
                 QueueElementLists* invLists = static_cast<QueueElementLists*> (probeBucket.getIndex(SL));
 
                 // todo shouldn't I initialize the lists? no! already initialized from Incremental
 
                 retrArg[0].state->initializeForNewBucket(invLists);
 
-                for (row_type i = 0; i < xValues->size(); ++i) {
+                for (row_type i = 0; i < sampleSize; ++i) {
 
-                    int t = xValues->at(i).i;
-                    int ind = xValues->at(i).j;
+                    int t = probeBucket.xValues->at(i).i;
+                    int ind = probeBucket.xValues->at(i).j;
                     const double* query = retrArg[t].queryMatrix->getMatrixRowPtr(ind);
 
-                    std::vector<QueueElement>& prevResults = retrArg[0].globalData[b - 1][t][ind].results;
+                    const std::vector<QueueElement>& prevResults = prevBucket.sampleThetas[t].at(ind).results;
 
                     retrArg[0].heap.assign(prevResults.begin(), prevResults.end());
                     std::make_heap(retrArg[0].heap.begin(), retrArg[0].heap.end(), std::greater<QueueElement>());
@@ -237,19 +242,21 @@ namespace ta {
                     retrArg[0].tunerTimer.stop();
                     sampleTimes[i] = retrArg[0].tunerTimer.elapsedTime().nanos();
                 }
+            }else {
+                probeBucket.setAfterTuning(prevBucket.numLists, prevBucket.t_b);
             }
 
         }
 
-        inline virtual void runTopK(ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void runTopK(ProbeBucket& probeBucket, RetrievalArguments* arg) const{
             QueueElementLists* invLists = static_cast<QueueElementLists*> (probeBucket.getIndex(SL));
 
             for (auto& queryBatch : arg->queryBatches) {
 
-                if (queryBatch.inactiveCounter == queryBatch.rowNum)
+                if (queryBatch.isWorkDone())
                     continue;
 
-                if (!invLists->initialized) {
+                if (!invLists->isInitialized()) {
 #ifdef TIME_IT
                     arg->t.start();
 #endif
@@ -266,7 +273,7 @@ namespace ta {
                 int start = queryBatch.startPos * arg->k;
                 int end = queryBatch.endPos * arg->k;
                 for (row_type i = start; i < end; i += arg->k) {
-                    if (queryBatch.inactiveQueries[user - queryBatch.startPos]) {
+                    if (queryBatch.isQueryInactive(user)) {
                         user++;
                         continue;
                     }
@@ -277,8 +284,7 @@ namespace ta {
                     double minScore = arg->topkResults[i].data;
 
                     if (probeBucket.normL2.second < minScore) {// skip this bucket and all other buckets
-                        queryBatch.inactiveQueries[user - queryBatch.startPos] = true;
-                        queryBatch.inactiveCounter++;
+                        queryBatch.inactivateQuery(user);
                         user++;
                         continue;
                     }
@@ -296,14 +302,14 @@ namespace ta {
 
         }
 
-        inline virtual void run(ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void run(ProbeBucket& probeBucket, RetrievalArguments* arg) const{
             QueueElementLists* invLists = static_cast<QueueElementLists*> (probeBucket.getIndex(SL));
 
             arg->state->initializeForNewBucket(invLists);
 
             for (auto& queryBatch : arg->queryBatches) {
 
-                if (queryBatch.normL2.second < probeBucket.bucketScanThreshold) {
+                if (queryBatch.maxLength() < probeBucket.bucketScanThreshold) {
                     break;
                 }
 

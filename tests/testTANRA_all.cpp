@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 /*
-* runNaive.cc
-*
-* Created on: Sep 21, 2012
-* Author: chteflio
-*/
+ * runNaive.cc
+ *
+ * Created on: Sep 21, 2012
+ * Author: chteflio
+ */
 /* 
  * File:   testTANRA_all.cpp
  * Author: chteflio
@@ -41,13 +41,17 @@ using namespace rg;
 int main() {
 
     LEMPArg args;
-    args.theta = 1.74;
+    args.theta = 0.035;//1.74;
+    args.isTARR = false;
 
-    args.usersFile = "/home/chteflio/data/ta-data/so_x_p_proj5_1-w-50-svd.mma";
-    args.itemsFile = "/home/chteflio/data/ta-data/so_x_p_proj5_1-h-50-svd.mma";
-    
-    
-    
+//        args.usersFile = "/home/chteflio/data/ta-data/so_x_p_proj5_1-w-50-svd.mma";
+//        args.itemsFile = "/home/chteflio/data/ta-data/so_x_p_proj5_1-h-50-svd.mma";
+
+    args.usersFile = "/home/chteflio/chteflioInMPI/data/ta-data/w-gnmf-sample.mma";
+    args.itemsFile = "/home/chteflio/chteflioInMPI/data/ta-data/h-gnmf-sample.mma";
+
+
+
 
     args.logFile = "/home/chteflio/workspace/Log.txt";
 

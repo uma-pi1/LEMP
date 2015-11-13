@@ -31,8 +31,7 @@ namespace ta {
         CoordRetriever() = default;
         ~CoordRetriever() = default;
 
-
-        inline virtual void run(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void run(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
 
             IntLists* invLists = static_cast<IntLists*> (probeBucket.getIndex(INT_SL));
             row_type numItemsToVerify = 0;
@@ -100,14 +99,13 @@ namespace ta {
             }
         }
 
-        inline virtual void run(QueryBucket_withTuning& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void run(QueryBatch& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
 
 #ifdef TIME_IT
             arg->t.start();
 #endif
-            if (!queryBatch.initializedQueues) { //preprocess
+            if (!queryBatch.hasInitializedQueues()) { //preprocess
                 queryBatch.preprocess(*(arg->queryMatrix), arg->maxLists);
-                queryBatch.initializedQueues = true;
             }
 #ifdef TIME_IT
             arg->t.stop();
@@ -130,13 +128,13 @@ namespace ta {
 
         }
 
-        inline void runTopK(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void runTopK(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
 
             row_type numItemsToVerify = 0;
             IntLists* invLists = static_cast<IntLists*> (probeBucket.getIndex(INT_SL));
             double localTheta = arg->heap.front().data * (arg->heap.front().data > 0 ? probeBucket.invNormL2.second : probeBucket.invNormL2.first);
 
-            if (!invLists->initialized) {
+            if (!invLists->isInitialized()) {
 #ifdef TIME_IT
                 arg->t.start();
 #endif
@@ -207,13 +205,12 @@ namespace ta {
 
         }
 
-        inline virtual void runTopK(QueryBucket_withTuning& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void runTopK(QueryBatch& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
 #ifdef TIME_IT
             arg->t.start();
 #endif
-            if (!queryBatch.initializedQueues) { //preprocess
+            if (!queryBatch.hasInitializedQueues()) { //preprocess
                 queryBatch.preprocess(*(arg->queryMatrix), arg->maxLists);
-                queryBatch.initializedQueues = true;
             }
 #ifdef TIME_IT
             arg->t.stop();
@@ -227,7 +224,7 @@ namespace ta {
             int end = queryBatch.endPos * arg->k;
             for (row_type i = start; i < end; i += arg->k) {
 
-                if (queryBatch.inactiveQueries[user - queryBatch.startPos]) {
+                if (queryBatch.isQueryInactive(user)) {
                     user++;
                     continue;
                 }
@@ -235,8 +232,7 @@ namespace ta {
                 double minScore = arg->topkResults[i].data;
 
                 if (probeBucket.normL2.second < minScore) {// skip this bucket and all other buckets
-                    queryBatch.inactiveQueries[user - queryBatch.startPos] = true;
-                    queryBatch.inactiveCounter++;
+                    queryBatch.inactivateQuery(user);
                     user++;
                     continue;
                 }
@@ -255,35 +251,36 @@ namespace ta {
 
         }
 
-        inline virtual void tune(ProbeBucket& probeBucket, std::vector<RetrievalArguments>& retrArg) {
+        inline virtual void tune(ProbeBucket& probeBucket, const ProbeBucket& prevBucket, std::vector<RetrievalArguments>& retrArg) {
 
-            if (xValues->size() > 0) {
-                dataForTuning.tune(probeBucket, retrArg, this);
+            if (probeBucket.xValues->size() > 0) {
+                dataForTuning.tune(probeBucket, prevBucket, retrArg, this);
+            } else {
+                probeBucket.setAfterTuning(prevBucket.numLists, prevBucket.t_b);
             }
         }
 
-        inline virtual void tuneTopk(ProbeBucket& probeBucket, std::vector<RetrievalArguments>& retrArg) {
-
-            if (xValues->size() > 0) {
-                dataForTuning.tuneTopk(probeBucket, retrArg, this);
+        inline virtual void tuneTopk(ProbeBucket& probeBucket, const ProbeBucket& prevBucket, std::vector<RetrievalArguments>& retrArg) {
+            row_type sampleSize = (probeBucket.xValues != nullptr ? probeBucket.xValues->size() : 0);
+            if (sampleSize > 0) {
+                dataForTuning.tuneTopk(probeBucket, prevBucket, retrArg, this);
+            } else {
+                probeBucket.setAfterTuning(prevBucket.numLists, prevBucket.t_b);
             }
 
         }
 
-
-
-        inline virtual void runTopK(ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void runTopK(ProbeBucket& probeBucket, RetrievalArguments* arg) const{
             arg->numLists = probeBucket.numLists;
-            
-            for(auto& queryBatch: arg->queryBatches){
-                if (queryBatch.inactiveCounter == queryBatch.rowNum)
+
+            for (auto& queryBatch : arg->queryBatches) {
+                if (queryBatch.isWorkDone())
                     continue;
 #ifdef TIME_IT
                 arg->t.start();
 #endif
-                if (!queryBatch.initializedQueues) { //preprocess
+                if (!queryBatch.hasInitializedQueues()) { //preprocess
                     queryBatch.preprocess(*(arg->queryMatrix), arg->maxLists);
-                    queryBatch.initializedQueues = true;
                 }
 #ifdef TIME_IT
                 arg->t.stop();
@@ -295,7 +292,7 @@ namespace ta {
                 int end = queryBatch.endPos * arg->k;
                 for (row_type i = start; i < end; i += arg->k) {
 
-                    if (queryBatch.inactiveQueries[user - queryBatch.startPos]) {
+                    if (queryBatch.isQueryInactive(user)) {
                         user++;
                         continue;
                     }
@@ -304,8 +301,7 @@ namespace ta {
                     double minScore = arg->topkResults[i].data;
 
                     if (probeBucket.normL2.second < minScore) {// skip this bucket and all other buckets
-                        queryBatch.inactiveQueries[user - queryBatch.startPos] = true;
-                        queryBatch.inactiveCounter++;
+                        queryBatch.inactivateQuery(user);
                         user++;
                         continue;
                     }
@@ -328,19 +324,18 @@ namespace ta {
 
         }
 
-        inline virtual void run(ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void run(ProbeBucket& probeBucket, RetrievalArguments* arg) const{
             arg->numLists = probeBucket.numLists;
 
-            for(auto& queryBatch: arg->queryBatches){
-                if (queryBatch.normL2.second < probeBucket.bucketScanThreshold) {
+            for (auto& queryBatch : arg->queryBatches) {
+                if (queryBatch.maxLength() < probeBucket.bucketScanThreshold) {
                     break;
                 }
 #ifdef TIME_IT
                 arg->t.start();
 #endif
-                if (!queryBatch.initializedQueues) { //preprocess
+                if (!queryBatch.hasInitializedQueues()) { //preprocess
                     queryBatch.preprocess(*(arg->queryMatrix), arg->maxLists);
-                    queryBatch.initializedQueues = true;
                 }
 #ifdef TIME_IT
                 arg->t.stop();

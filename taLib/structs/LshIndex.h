@@ -22,9 +22,6 @@
 #ifndef LSHINDEX_H
 #define	LSHINDEX_H
 
-#include <taLib/structs/Lists.h>
-#include <taLib/ap/includes.h>
-
 
 namespace ta {
 
@@ -53,8 +50,8 @@ namespace ta {
 
         // call from the probe bucket
 
-        inline void checkAndReallocateAll(VectorMatrix* matrix, bool forProbe, row_type start, row_type end, row_type activeBuckets,
-                std::vector<float>& sums, std::vector<row_type>& countsOfBlockValues, uint8_t* my_sketches, RandomIntGaussians* rig) {
+        inline void checkAndReallocateAll(const VectorMatrix* matrix, bool forProbe, row_type start, row_type end, row_type activeBuckets,
+                std::vector<float>& sums, std::vector<row_type>& countsOfBlockValues, uint8_t* my_sketches) {
 
             row_type startBlock = initializedSketchesForIndex;
             uint8_t* ptrSketches = (forProbe ? my_sketches : cosSketches->sketches);
@@ -63,7 +60,7 @@ namespace ta {
 
                 // find end block
                 row_type endBlock = activeBuckets;
-                cosSketches->buildBatch(matrix, start, end, sums, ptrSketches, rig, startBlock, endBlock);
+                cosSketches->buildBatch(matrix, start, end, sums, ptrSketches, startBlock, endBlock);
 
                 if (forProbe) {
                     lshBins->populateBins(ptrSketches, startBlock, endBlock, countsOfBlockValues);
@@ -74,8 +71,8 @@ namespace ta {
 
         // call for query
 
-        inline void checkAndReallocateSingle(VectorMatrix* matrix, row_type posInMatrix, row_type posInBucket, row_type activeBuckets,
-                std::vector<float>& sums, RandomIntGaussians* rig) {
+        inline void checkAndReallocateSingle(const VectorMatrix* matrix, row_type posInMatrix, row_type posInBucket, row_type activeBuckets,
+                std::vector<float>& sums) {
             row_type startBlock = initializedSketches[posInBucket];
             if (startBlock < activeBuckets) { // reallocate
 
@@ -87,7 +84,7 @@ namespace ta {
                 row_type startHashBit = startBlock * cosSketches->hashCodeLength;
                 row_type endHashBit = endBlock * cosSketches->hashCodeLength;
 
-                cosSketches->buildSingle(vec, posInBucket, matrix->colNum, sums, rig, cosSketches->sketches, startBlock, endBlock, startHashBit, endHashBit, startOffset);
+                cosSketches->buildSingle(vec, posInBucket, matrix->colNum, sums, cosSketches->sketches, startBlock, endBlock, startHashBit, endHashBit, startOffset);
                 initializedSketches[posInBucket] = endBlock;
 
             }
@@ -124,8 +121,7 @@ namespace ta {
                         default:
                             lshBins = new LshBinsSparse<uint64_t>();
                             break;
-                    }
-                    
+                    }                    
 
                     lshBins->init(cosSketches->bytesPerCode, cosSketches->numHashTables, cosSketches->nVectors);
                 }

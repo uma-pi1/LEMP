@@ -62,11 +62,17 @@ namespace ta {
                 std::cout << "Problem with opening log-file. No log-file will be created" << std::endl;
             }
 
-
-            std::cout << "ALGO: TANRA_all" << std::endl;
+            
+             if (args.isTARR) {
+                std::cout << "ALGO: TANRA_all with RR" << std::endl;
+            } else {
+                std::cout << "ALGO: TANRA_all with MaxPiQi" << std::endl;
+            }
+            
+            
             std::cout << "Threads: " << args.threads << std::endl;
 
-            retrArg = new RetrievalArguments(probeMatrix.colNum, &queryMatrix, &probeMatrix, LEMP_TANRA, false);
+            retrArg = new RetrievalArguments(probeMatrix.colNum, &queryMatrix, &probeMatrix, LEMP_TANRA, false, args.isTARR);
             retrArg->k = args.k;
             retrArg->theta = args.theta;
 
@@ -114,7 +120,7 @@ namespace ta {
             for (row_type i = 0; i < queryMatrix.rowNum; i++) {
                 const double* query = queryMatrix.getMatrixRowPtr(i);
                 retrArg->queryId = i;
-                probeBucket.ptrRetriever->run(query, probeBucket, retrArg);      
+                probeBucket.ptrRetriever->run(query, probeBucket, retrArg); 
             }
 
 
@@ -130,11 +136,11 @@ namespace ta {
             std::cout << "Total time: " << (dataManipulationTime / 1E9) + t.elapsedTime().seconds() << std::endl;
 
             
-            std::cout << "preprocessTime: " << retrArg->preprocessTime / 1E9 << std::endl;
-            std::cout << "ipTime: " << retrArg->ipTime / 1E9 << std::endl;
-            std::cout << "boundsTime: " << retrArg->boundsTime / 1E9 << std::endl;
-            std::cout << "scanTime: " << retrArg->scanTime / 1E9 << std::endl;
-            std::cout << "filterTime: " << retrArg->filterTime / 1E9 << std::endl;
+//            std::cout << "preprocessTime: " << retrArg->preprocessTime / 1E9 << std::endl;
+//            std::cout << "ipTime: " << retrArg->ipTime / 1E9 << std::endl;
+//            std::cout << "boundsTime: " << retrArg->boundsTime / 1E9 << std::endl;
+//            std::cout << "scanTime: " << retrArg->scanTime / 1E9 << std::endl;
+//            std::cout << "filterTime: " << retrArg->filterTime / 1E9 << std::endl;
 
 
             logging << "\t" << args.theta << "\t" << retrArg->comparisons << "\t" << getResultSetSize() << "\t";

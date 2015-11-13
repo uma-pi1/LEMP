@@ -26,39 +26,61 @@ namespace ta {
 
     double matrixToMatrixTime2 = 0;
 
-
-    class QueryBucket_withTuning {
+    class QueryBatch {
         col_type* queues;
-
-
+        bool initializedQueues;
+        row_type rowNum;
+        std::vector<bool> inactiveQueries;
+        row_type inactiveCounter;
+        std::pair<double, double> normL2; // first: min second: max
+        
     public:
 
         LshIndex * lshIndex;
-        row_type startPos, endPos, rowNum;
-        row_type inactiveCounter;
-        bool initializedQueues;
-        std::vector<bool> inactiveQueries;
-        std::pair<double, double> normL2; // first: min second: max
+        row_type startPos, endPos;
         
+
+        inline bool hasInitializedQueues() const {
+            return initializedQueues;
+        }
+
+        inline bool isWorkDone() const {
+            return (inactiveCounter == rowNum);
+        }
+
+        inline void inactivateQuery(row_type queryPosInWholeMatrix) {
+            inactiveQueries[queryPosInWholeMatrix - startPos] = true;
+            inactiveCounter++;
+        }
+
+        inline bool isQueryInactive(row_type queryPosInWholeMatrix) const {
+            return inactiveQueries[queryPosInWholeMatrix - startPos];
+        }
+
+        inline double maxLength() const{
+            return normL2.second;
+        }
+
+        inline double minLength() const{
+            return normL2.first;
+        }
+
 
         inline void preprocess(const VectorMatrix& userMatrix, col_type maxLists);
 
         inline col_type* getQueue(row_type user, col_type maxLists) const {
             return &queues[user * maxLists];
         }
-  
 
         inline void createLshIndex(const VectorMatrix& matrix) {
             lshIndex = new LshIndex();
             lshIndex->initializeLists(matrix, false, startPos, endPos);
         }
 
-
-        inline QueryBucket_withTuning() : initializedQueues(false), queues(nullptr),
-        inactiveCounter(0),  lshIndex(nullptr){
+        inline QueryBatch() : initializedQueues(false), queues(nullptr), inactiveCounter(0), lshIndex(nullptr) {
         };
 
-        inline ~QueryBucket_withTuning() {
+        inline ~QueryBatch() {
             if (queues != nullptr)
                 delete[] queues;
 
@@ -66,7 +88,7 @@ namespace ta {
                 delete lshIndex;
         }
 
-        inline void init(const VectorMatrix& matrix, row_type startInd, row_type endInd, LEMPArg& args) {
+        inline void init(const VectorMatrix& matrix, row_type startInd, row_type endInd, const LEMPArg& args) {
             startPos = startInd;
             endPos = endInd;
             rowNum = endPos - startPos;
@@ -80,7 +102,7 @@ namespace ta {
 
     };
 
-    inline void QueryBucket_withTuning::preprocess(const VectorMatrix& userMatrix, col_type maxLists) {
+    inline void QueryBatch::preprocess(const VectorMatrix& userMatrix, col_type maxLists) {
 
         queues = new col_type[rowNum * maxLists];
 
@@ -104,7 +126,7 @@ namespace ta {
                 if (value > tmp.front().data) {
                     std::pop_heap(tmp.begin(), tmp.end(), std::greater<QueueElement>());
                     tmp.pop_back();
-                    tmp.emplace_back(value,i);
+                    tmp.emplace_back(value, i);
                     std::push_heap(tmp.begin(), tmp.end(), std::greater<QueueElement>());
                 }
             }
@@ -114,6 +136,8 @@ namespace ta {
                 queues[j * maxLists + i] = tmp[i].id;
             }
         }
+
+        initializedQueues = true;
 
     }
 

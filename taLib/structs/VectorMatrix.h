@@ -86,34 +86,18 @@ namespace ta {
         return sqrt(len);
     }
 
-    struct VectorMatrix {
+    class VectorMatrix {
         double* data;
         bool shuffled, normalized, extraMult;
-
-        std::vector<double> cweights;
-        std::vector<double> maxVectorCoord;
-        std::vector<row_type> vectorNNZ;
-        std::vector<QueueElement> colFrequencies;
-
-        row_type colNum, offset, lengthOffset;
-        row_type rowNum;
-        std::vector<QueueElement> lengthInfo; // data: length id: vectorId
-
-
-        std::vector<double> epsilonEquivalents;
-
-        // for simd instruction  
-        int sizeDiv2;
-
-    private:
+        row_type offset;
+        col_type lengthOffset;        
+        int sizeDiv2;// for simd instruction  
 
         inline void zeroOutLastPadding() {
             for (row_type i = 0; i < rowNum; ++i) {
                 data[(i + 1) * offset - 3] = 0; // zero-out the last padding
             }
         }
-
-
 
         // stuff that needs to be done in both read methods
         // rowNum and colNum need to be initialized before calling this method
@@ -143,9 +127,8 @@ namespace ta {
                 setLengthInData(i, 1);
             }
         }
-        
-        
-        inline void readFromFileCSV(std::string& fileName, ta_size_type col, ta_size_type row) {
+
+        inline void readFromFileCSV(const std::string& fileName, ta_size_type col, ta_size_type row) {
             std::ifstream file(fileName.c_str(), std::ios_base::in);
 
             std::cout << "Reading file: " << fileName << " -- columns: " << col << "  rows: " << row << std::endl;
@@ -175,7 +158,7 @@ namespace ta {
             file.close();
         }
 
-        inline void readFromFileMMA(std::string& fileName, bool left = true) {
+        inline void readFromFileMMA(const std::string& fileName, bool left = true) {
             std::ifstream file(fileName.c_str(), std::ios_base::in);
             while (file.peek() == '%') {
                 skipLineFromFile(file);
@@ -221,8 +204,20 @@ namespace ta {
             }
         }
 
-
     public:
+
+        std::vector<double> cweights; // forAP
+        std::vector<double> maxVectorCoord;// forAP
+        std::vector<row_type> vectorNNZ;// forAP
+        std::vector<QueueElement> lengthInfo; // data: length id: vectorId
+        std::vector<double> epsilonEquivalents;
+        col_type colNum;
+        row_type rowNum;
+
+
+        friend void initializeMatrices(const VectorMatrix& originalMatrix, std::vector<VectorMatrix>& matrices, bool sort, bool ignoreLengths, double epsilon);
+        friend void localToGlobalIds(const std::vector<QueueElement>& localResults, int k, std::vector<MatItem>& globalResults, const VectorMatrix& userMatrix);
+       
 
         inline VectorMatrix() : data(nullptr), shuffled(false), normalized(false), lengthOffset(1) {////////////////////// 1 is for padding
         }
@@ -256,8 +251,7 @@ namespace ta {
             }
         }
 
-
-        inline void readFromFile(std::string& fileName, int numCoordinates, int numVectors, bool left = true) {
+        inline void readFromFile(const std::string& fileName, int numCoordinates, int numVectors, bool left = true) {
             if (boost::algorithm::ends_with(fileName, ".csv")) {
                 if (numCoordinates == 0 || numVectors == 0) {
                     std::cerr << "When using csv files, you should provide the number of coordinates (--r) and the number of vectors (--m or --n)" << std::endl;
@@ -272,9 +266,7 @@ namespace ta {
             }
         }
 
-    
-
-        inline void init(VectorMatrix& matrix, bool sort, bool ignoreLength) {
+        inline void init(const VectorMatrix& matrix, bool sort, bool ignoreLength) {
             initializeBasics(matrix.colNum, matrix.rowNum, true);
 
 
@@ -319,7 +311,7 @@ namespace ta {
             }
         }
 
-        inline void addVectors(const VectorMatrix& matrix, std::vector<row_type>& dataIds) {
+        inline void addVectors(const VectorMatrix& matrix, const std::vector<row_type>& dataIds) {
             initializeBasics(matrix.colNum, dataIds.size(), false);
             for (int i = 0; i < rowNum; ++i) {
                 const double* vec = matrix.getMatrixRowPtr(dataIds[i]);
@@ -331,6 +323,21 @@ namespace ta {
 
         inline double* getMatrixRowPtr(row_type row) const {// the row starts from pos 1. Do ptr[-1] to get the length
             return &data[row * offset + 1 + lengthOffset];
+        }
+
+        inline void print(row_type row) const {
+
+            const double* vec = getMatrixRowPtr(row);
+
+            for (int i = 0; i < colNum; ++i) {
+
+                std::cout << i << ":" << vec[i] << " ";
+            }
+            std::cout << std::endl;
+
+            std::cout << "Length: " << vec[-1] << " or " << lengthInfo[row].data << std::endl;
+            std::cout << "hasId: " << lengthInfo[row].id << std::endl;
+
         }
 
         inline double getVectorLength(row_type row) const {
@@ -345,7 +352,7 @@ namespace ta {
             return (normalized ? lengthInfo[row].id : row);
         }
 
-        inline double cosine(row_type row, const double* query) {
+        inline double cosine(row_type row, const double* query) const{
 
             const double* d_ptr = getMatrixRowPtr(row);
             double cosine = 0;
@@ -383,9 +390,10 @@ namespace ta {
             }
             return sqrt(dist);
         }
-        // I assume non normalized case as needed in PCA trees
+        
 
         inline double L2Distance2(row_type row, const double* query)const {
+            // I assume non normalized case as needed in PCA trees
             const double* d_ptr = getMatrixRowPtr(row);
             double dist = 0;
             for (int i = 0; i < colNum; ++i) {
@@ -394,12 +402,12 @@ namespace ta {
             return dist;
         }
 
-        inline double innerProduct(row_type row, const double* query) {
+        inline double innerProduct(row_type row, const double* query) const {
             const double ip = query[-1] * getVectorLength(row) * cosine(row, query);
             return ip;
         }
 
-        inline std::pair<bool, double> passesThreshold(row_type row, const double* query, double theta) {
+        inline std::pair<bool, double> passesThreshold(row_type row, const double* query, double theta) const {
 
             std::pair<bool, double> p;
             double ip = 1;
@@ -430,7 +438,7 @@ namespace ta {
 
     /*  map: id: original matrix id, first: thread second: posInMatrix
      */
-    inline void initializeMatrices(VectorMatrix& originalMatrix, std::vector<VectorMatrix>& matrices, bool sort, bool ignoreLengths, double epsilon = 0) {
+    inline void initializeMatrices(const VectorMatrix& originalMatrix, std::vector<VectorMatrix>& matrices, bool sort, bool ignoreLengths, double epsilon = 0) {
 
         row_type threads = matrices.size();
 
@@ -564,8 +572,7 @@ namespace ta {
         }
     }
 
-    inline void localToGlobalIds(const std::vector<QueueElement>& localResults, int k, std::vector<MatItem>& globalResults,
-            const VectorMatrix& userMatrix) {
+    inline void localToGlobalIds(const std::vector<QueueElement>& localResults, int k, std::vector<MatItem>& globalResults, const VectorMatrix& userMatrix) {
         globalResults.clear();
         globalResults.reserve(localResults.size()); // queries*k
         row_type user = 0;
@@ -635,7 +642,7 @@ namespace ta {
         }
     }
 
-    inline void writeResults(std::vector< std::vector<MatItem >* >& globalResults, std::string& file) {
+    inline void writeResults(const std::vector< std::vector<MatItem >* >& globalResults, std::string& file) {
 
         std::ofstream out(file.c_str());
 

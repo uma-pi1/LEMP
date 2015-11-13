@@ -22,6 +22,7 @@ int main(int argc, char *argv[]) {
     string logFile, resultsFile;
 
     bool querySideLeft = true;
+    bool isTransformed = false;
     int k, r, m, n;
 
 
@@ -33,6 +34,7 @@ int main(int argc, char *argv[]) {
             ("P", value<string>(&rightMatrix), "file containing the probe matrix (right side)")
 //            ("eps", value<double>(&epsilon)->default_value(0.03), "false negative rate (unused)")
             ("querySideLeft", value<bool>(&querySideLeft)->default_value(true), "1 if Q^T contains the queries (default). Interesting for Row-Top-k")
+            ("isTransformed", value<bool>(&isTransformed)->default_value(false), "1 if the input files contain the tranformed vectors. If 0 the program will transform them")
             ("k", value<int>(&k), "top k ")
             ("logFile", value<string>(&logFile)->default_value(""), "output File (contains runtime information)")
             ("resultsFile", value<string>(&resultsFile)->default_value(""), "output File (contains the results)")
@@ -70,6 +72,7 @@ int main(int argc, char *argv[]) {
     args.r = r;
     args.m = m;
     args.n = n;
+    args.isTransformed = isTransformed;
 
     ta::SimpleLSH algo(args);
     algo.runTopkPerUser();

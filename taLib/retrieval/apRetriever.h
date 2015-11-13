@@ -27,7 +27,7 @@ namespace ta {
 
         void l2apProcessCandidates(const double* query, row_type nnzQuery, double maxQueryCoord,
                 row_type numCandidates, double localTheta, L2apIndex* index,
-                ProbeBucket& probeBucket, RetrievalArguments* arg) {
+                ProbeBucket& probeBucket, RetrievalArguments* arg) const{
 
 
             double queryLength = query[-1];
@@ -159,7 +159,7 @@ nexcid:
 
         void l2apProcessCandidatesTopk(const double* query, row_type nnzQuery, double maxQueryCoord,
                 row_type numCandidates, double localTheta, L2apIndex* index,
-                ProbeBucket& probeBucket, RetrievalArguments* arg) {
+                ProbeBucket& probeBucket, RetrievalArguments* arg) const{
 
 
             double queryLength = query[-1];
@@ -303,7 +303,7 @@ nexcid:
         }
 
         void l2apFindMatches(const double * query, row_type nnzQuery, double maxQueryCoord,
-                L2apIndex* index, ProbeBucket& probeBucket, RetrievalArguments* arg) {
+                L2apIndex* index, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
 
             double queryLength = query[-1];
 
@@ -449,7 +449,7 @@ nexcid:
         }
 
         void l2apFindMatchesTopk(const double * query, row_type nnzQuery, double maxQueryCoord,
-                L2apIndex* index, ProbeBucket& probeBucket, RetrievalArguments* arg) {
+                L2apIndex* index, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
 
             double localTheta;
 
@@ -606,47 +606,47 @@ nexcid:
 
         ~apRetriever() = default;
 
-        inline virtual void run(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void run(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
             std::cerr << "Error! You shouldn't have called that" << std::endl;
             exit(1);
         }
 
-        inline virtual void run(QueryBucket_withTuning& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void run(QueryBatch& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
             std::cerr << "Error! You shouldn't have called that" << std::endl;
             exit(1);
         }
 
-        inline void runTopK(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline void runTopK(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg)const {
             std::cerr << "Error! You shouldn't have called that" << std::endl;
             exit(1);
         }
 
-        inline virtual void runTopK(QueryBucket_withTuning& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void runTopK(QueryBatch& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
             std::cerr << "Error! You shouldn't have called that" << std::endl;
             exit(1);
         }
 
-        inline virtual void tune(ProbeBucket& probeBucket, std::vector<RetrievalArguments>& retrArg) {
+        inline virtual void tune(ProbeBucket& probeBucket, const ProbeBucket& prevBucket, std::vector<RetrievalArguments>& retrArg) {
             std::cerr << "Error! You shouldn't have called that" << std::endl;
             exit(1);
         }
 
-        inline virtual void tuneTopk(ProbeBucket& probeBucket, std::vector<RetrievalArguments>& retrArg) {
+        inline virtual void tuneTopk(ProbeBucket& probeBucket, const ProbeBucket& prevBucket,  std::vector<RetrievalArguments>& retrArg) {
             std::cerr << "Error! You shouldn't have called that" << std::endl;
             exit(1);
         }
 
-        inline virtual void runTopK(ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void runTopK(ProbeBucket& probeBucket, RetrievalArguments* arg) const{
             L2apIndex* index = static_cast<L2apIndex*> (probeBucket.getIndex(AP));
 
 
             for(auto& queryBatch: arg->queryBatches){
 
-                if (queryBatch.inactiveCounter == queryBatch.rowNum)
+                if (queryBatch.isWorkDone())
                     continue;
 
 
-                if (!index->initialized) {
+                if (!index->isInitialized()) {
 #if defined(TIME_IT)
                     arg->t.start();
 #endif
@@ -665,7 +665,7 @@ nexcid:
                 int end = queryBatch.endPos * arg->k;
                 for (row_type i = start; i < end; i += arg->k) {
 
-                    if (queryBatch.inactiveQueries[user - queryBatch.startPos]) {
+                    if (queryBatch.isQueryInactive(user)) {
                         user++;
                         continue;
                     }
@@ -676,8 +676,7 @@ nexcid:
                     double minScore = arg->topkResults[i].data;
 
                     if (probeBucket.normL2.second < minScore) {// skip this bucket and all other buckets
-                        queryBatch.inactiveQueries[user - queryBatch.startPos] = true;
-                        queryBatch.inactiveCounter++;
+                        queryBatch.inactivateQuery(user); 
                         user++;
                         continue;
                     }
@@ -703,13 +702,13 @@ nexcid:
 
         }
 
-        inline virtual void run(ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void run(ProbeBucket& probeBucket, RetrievalArguments* arg) const{
 
             L2apIndex* index = static_cast<L2apIndex*> (probeBucket.getIndex(AP));
 
                for(auto& queryBatch: arg->queryBatches){
 
-                if (queryBatch.normL2.second < probeBucket.bucketScanThreshold) {
+                if (queryBatch.maxLength() < probeBucket.bucketScanThreshold) {
                     break;
                 }
 

@@ -81,8 +81,7 @@ int main(int argc, char *argv[]) {
         cout << desc << endl;
         return 1;
     }
-    
-    
+        
     LEMPArg args;
     args.theta = theta;
     args.usersFile = leftMatrix;

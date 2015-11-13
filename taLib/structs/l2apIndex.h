@@ -21,9 +21,6 @@
 #ifndef L2APINDEX_H
 #define	L2APINDEX_H
 
-#include <taLib/structs/Lists.h>
-#include <taLib/ap/includes.h>
-#include <taLib/ap/connect.h>
 
 namespace ta {
 

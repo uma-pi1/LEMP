@@ -12,12 +12,15 @@
 namespace ta {
 
     class LshBins {
-    public:
+    protected:
         long long userOffset;
         row_type bytesPerCode;
         row_type numHashTables;
         row_type nVectors;
         long long numBinsPerHashTable;
+
+    public:
+
 
         inline LshBins() = default;
 
@@ -46,6 +49,7 @@ namespace ta {
     };
 
     // only for 8bit signatures
+
     class LshBinsDense : public LshBins {
     public:
         std::vector<row_type > binsOffsets;
@@ -64,7 +68,7 @@ namespace ta {
             data.resize(endBlock * nVectors);
             row_type numValuesPerBlock = 256;
             binsOffsets.resize(endBlock * (numValuesPerBlock + 1));
-            
+
             // update hashBuckets
             for (int block = startBlock; block < endBlock; ++block) {
                 row_type startOffset = bytesPerCode * block;
@@ -73,7 +77,6 @@ namespace ta {
                 for (row_type i = 0; i < nVectors; ++i) {
                     long long t = i * userOffset + startOffset;
                     uint8_t key = sketch[t];
-                    //                    std::cout<<" hv: "<<(int)key<<" t: "<<t<<std::endl;
                     countsOfBlockValues[key]++;
                 }
 
@@ -95,7 +98,6 @@ namespace ta {
 
         }
 
-
         inline void getCandidates(uint8_t* querySketches, row_type queryPos, row_type* candidatesToVerify, row_type& numCandidatesToVerify,
                 boost::dynamic_bitset<>& done, row_type activeBlocks, row_type probeBucketStartPos) {
 
@@ -103,7 +105,7 @@ namespace ta {
             long long t = queryPos * userOffset;
             row_type offset2 = 256 + 1;
             row_type offset = 0;
-	    
+
 
             for (row_type block = 0; block < activeBlocks; ++block) {
 
@@ -111,7 +113,7 @@ namespace ta {
                 t++;
 
                 row_type start = binsOffsets[block * offset2 + key];
-                row_type end = binsOffsets[block * offset2 + key + 1];		
+                row_type end = binsOffsets[block * offset2 + key + 1];
 
                 for (row_type j = start; j < end; ++j) { // find all with same hash value in probe
 
@@ -134,10 +136,8 @@ namespace ta {
     template<typename T>// for 16, 32 64 bit signatures
     class LshBinsSparse : public LshBins {
     public:
-        
-        std::vector<unordered_map<T, std::vector<row_type> > > bins;
-        
 
+        std::vector<unordered_map<T, std::vector<row_type> > > bins;
         inline LshBinsSparse() = default;
 
         inline void populateBins(uint8_t* sketch, row_type startBlock, row_type endBlock, std::vector<row_type>& countsOfBlockValues) {
@@ -161,7 +161,7 @@ namespace ta {
 
         inline virtual void printBins() {
             for (int block = 0; block < bins.size(); ++block) {
-                
+
                 std::cout << "block: " << block << std::endl;
                 for (auto it = bins[block].begin(); it != bins[block].end(); it++) {
                     std::cout << "hv: " << (int) it->first << " size: " << it->second.size() << std::endl;
@@ -176,10 +176,10 @@ namespace ta {
         inline void getCandidates(uint8_t* querySketches, row_type queryPos, row_type* candidatesToVerify, row_type& numCandidatesToVerify,
                 boost::dynamic_bitset<>& done, row_type activeBlocks, row_type probeBucketStartPos) {
 
-            
+
             done.reset();
-            long long t = queryPos * userOffset;         
-            
+            long long t = queryPos * userOffset;
+
             for (row_type block = 0; block < activeBlocks; ++block) {
 
                 T key = 0;

@@ -30,15 +30,15 @@ namespace ta {
 
         inline void processIndexesTopk(const double * query, row_type queryId,
                 LshIndex* index, LshIndex* queryIndex, int activeBlocks,
-                ProbeBucket& probeBucket, RetrievalArguments* arg) {
+                ProbeBucket& probeBucket, RetrievalArguments* arg)const {
 
             row_type numCandidatesToVerify = 0;
 
 #ifdef TIME_IT 
             arg->t.start();
 #endif
-                index->lshBins->getCandidates(queryIndex->cosSketches->sketches, queryId, arg->candidatesToVerify, numCandidatesToVerify,
-                        arg->done, activeBlocks, probeBucket.startPos);
+            index->lshBins->getCandidates(queryIndex->cosSketches->sketches, queryId, arg->candidatesToVerify, numCandidatesToVerify,
+                    arg->done, activeBlocks, probeBucket.startPos);
 
 #ifdef TIME_IT
             arg->t.stop();
@@ -55,7 +55,7 @@ namespace ta {
 
         inline void processIndexes(const double * query, row_type queryId,
                 LshIndex* index, LshIndex* queryIndex, int activeBlocks,
-                ProbeBucket& probeBucket, RetrievalArguments* arg) {
+                ProbeBucket& probeBucket, RetrievalArguments* arg) const{
 
 
             row_type numCandidatesToVerify = 0;
@@ -63,9 +63,9 @@ namespace ta {
             arg->t.start();
 #endif
 
-                index->lshBins->getCandidates(queryIndex->cosSketches->sketches, queryId, arg->candidatesToVerify, numCandidatesToVerify,
-                        arg->done, activeBlocks, probeBucket.startPos);
-  
+            index->lshBins->getCandidates(queryIndex->cosSketches->sketches, queryId, arg->candidatesToVerify, numCandidatesToVerify,
+                    arg->done, activeBlocks, probeBucket.startPos);
+
 #ifdef TIME_IT
             arg->t.stop();
             arg->scanTime += arg->t.elapsedTime().nanos();
@@ -87,71 +87,69 @@ namespace ta {
 
         ~LshRetriever() = default;
 
-        inline virtual void run(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void run(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
         }
 
-        inline virtual void run(QueryBucket_withTuning& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void run(QueryBatch& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
             std::cerr << "Error! You shouldn't have called that" << std::endl;
             exit(1);
         }
 
-        inline void runTopK(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline void runTopK(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg)const {
             std::cerr << "Error! You shouldn't have called that" << std::endl;
             exit(1);
         }
 
         // todo see that one from skratch
 
-        inline virtual void runTopK(QueryBucket_withTuning& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void runTopK(QueryBatch& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) {
         }
 
-        inline virtual void tune(ProbeBucket& probeBucket, std::vector<RetrievalArguments>& retrArg) {
+        inline virtual void tune(ProbeBucket& probeBucket, const ProbeBucket& prevBucket, std::vector<RetrievalArguments>& retrArg) {
 
-            if (xValues->size() > 0) {
+            row_type sampleSize = probeBucket.xValues->size();
+
+            if (sampleSize > 0) {
                 // measure length
-                plain.xValues = xValues;
-
                 // access plain properly
-
                 if (retrArg[0].competitorMethod != NULL) {
                     plain.sampleTimes = *(retrArg[0].competitorMethod);
                 } else {
-                    plain.tune(probeBucket, retrArg);
+                    plain.tune(probeBucket, prevBucket, retrArg);
                 }
 
-                double avgLengthTime = plain.sampleTotalTime / xValues->size();
+                double avgLengthTime = plain.sampleTotalTime / sampleSize;
 
 
                 // measure LSH
-                sampleTimes.resize(xValues->size());
+                sampleTimes.resize(sampleSize);
                 LshIndex* index = static_cast<LshIndex*> (probeBucket.getIndex(LSH));
 
                 // create lsh signatures for sample queries
                 LshIndex queryIndex;
-                queryIndex.initializeLists(xValues->size());
-
+                queryIndex.initializeLists(probeBucket.xValues->size());
 
                 double avgBlockTime = 0;
                 double min_t_b = -1;
-                int breakpoint = xValues->size() - 1;
+                int breakpoint = sampleSize - 1;
 
-                for (int i = xValues->size() - 1; i >= 0; i--) {
-                    int t = xValues->at(i).i;
-                    int ind = xValues->at(i).j;
+                for (int i = sampleSize - 1; i >= 0; i--) {
+                    int t = probeBucket.xValues->at(i).i;
+                    int ind = probeBucket.xValues->at(i).j;
 
                     const double* query = retrArg[t].queryMatrix->getMatrixRowPtr(ind);
 
                     double localTheta = probeBucket.bucketScanThreshold / query[-1];
-                    int activeBlocks = retrArg[0].findActiveBlocks(localTheta);
+                    int activeBlocks = repetitionsForTheta.findActiveBlocks(localTheta);
 
 
                     if (activeBlocks > LSH_SIGNATURES || activeBlocks <= 0) {
                         sampleTimes[i] = plain.sampleTimes[i];
 
                     } else {
-                        if (activeBlocks > index->initializedSketchesForIndex && i < xValues->size() - 1) {
+                        if (activeBlocks > index->initializedSketchesForIndex && i < sampleSize - 1) {
 
-                            double expectedTime = avgBlockTime * activeBlocks / (index->initializedSketchesForIndex * (xValues->size() - i));
+                            double expectedTime = avgBlockTime * activeBlocks / (index->initializedSketchesForIndex * (probeBucket.xValues->size() - i));
 
                             if (expectedTime > avgLengthTime) {
                                 min_t_b = localTheta;
@@ -162,10 +160,11 @@ namespace ta {
 
 
                         index->checkAndReallocateAll(retrArg[0].probeMatrix, true, probeBucket.startPos, probeBucket.endPos, activeBlocks,
-                                retrArg[0].sums, retrArg[0].countsOfBlockValues, retrArg[0].sketches, retrArg[0].rig);
+                                retrArg[0].sums, retrArg[0].countsOfBlockValues, retrArg[0].sketches);
 
                         retrArg[0].tunerTimer.start();
-                        queryIndex.checkAndReallocateSingle(retrArg[t].queryMatrix, ind, i, activeBlocks, retrArg[t].sums, retrArg[t].rig);
+                        queryIndex.checkAndReallocateSingle(retrArg[t].queryMatrix, ind, i, activeBlocks, retrArg[t].sums);
+                        ;
                         processIndexes(query, i, index, &queryIndex, activeBlocks, probeBucket, &retrArg[0]);
                         retrArg[0].tunerTimer.stop();
                         sampleTimes[i] = retrArg[0].tunerTimer.elapsedTime().nanos();
@@ -173,52 +172,53 @@ namespace ta {
                     }
                 }
 
-                if (breakpoint == xValues->size() - 1) {
+                if (breakpoint == sampleSize - 1) {
                     // compare
                     findCutOffPoint(sampleTimes, plain.sampleTimes, sampleTotalTime, t_b_indx);
 
                     if (plain.sampleTotalTime < sampleTotalTime) {
                         probeBucket.setAfterTuning(1, 1);
                     } else {
-                        double value = (t_b_indx == 0 ? -1 : xValues->at(t_b_indx).result);
+                        double value = (t_b_indx == 0 ? -1 : probeBucket.xValues->at(t_b_indx).result);
                         probeBucket.setAfterTuning(1, value);
                     }
 
                 } else {
 
-                    if (breakpoint == xValues->size() - 2) {
+                    if (breakpoint == sampleSize - 2) {
                         probeBucket.setAfterTuning(1, 1);
                     } else {
                         probeBucket.setAfterTuning(1, min_t_b);
                     }
                 }
+            } else {
+                probeBucket.setAfterTuning(prevBucket.numLists, prevBucket.t_b);
             }
 
         }
 
-        inline virtual void tuneTopk(ProbeBucket& probeBucket, std::vector<RetrievalArguments>& retrArg) {
-            row_type b = retrArg[0].bucketInd;
+        inline virtual void tuneTopk(ProbeBucket& probeBucket, const ProbeBucket& prevBucket, std::vector<RetrievalArguments>& retrArg) {
 
+            row_type sampleSize = (probeBucket.xValues != nullptr ? probeBucket.xValues->size() : 0);
 
-            if (xValues->size() > 0) {
-                plain.xValues = xValues;
-                plain.sampleTimes.reserve(xValues->size());
+            if (sampleSize > 0) {
+                plain.sampleTimes.reserve(sampleSize);
 
-                for (row_type i = 0; i < xValues->size(); ++i) {
-                    int t = xValues->at(i).i;
-                    int ind = xValues->at(i).j;
+                for (row_type i = 0; i < sampleSize; ++i) {
+                    int t = probeBucket.xValues->at(i).i;
+                    int ind = probeBucket.xValues->at(i).j;
 
-                    plain.sampleTimes.emplace_back(retrArg[0].globalData[b][t][ind].lengthTime);
-                    plain.sampleTotalTime += retrArg[0].globalData[b][t][ind].lengthTime;
+                    plain.sampleTimes.emplace_back(probeBucket.sampleThetas[t][ind].lengthTime);
+                    plain.sampleTotalTime += probeBucket.sampleThetas[t][ind].lengthTime;
                 }
 
-                double avgLengthTime = plain.sampleTotalTime / xValues->size();
+                double avgLengthTime = plain.sampleTotalTime / sampleSize;
 
                 // measure LSH
-                sampleTimes.resize(xValues->size());
+                sampleTimes.resize(sampleSize);
                 LshIndex* index = static_cast<LshIndex*> (probeBucket.getIndex(LSH));
 
-                if (!index->initialized) {
+                if (!index->isInitialized()) {
 #if defined(TIME_IT)
                     retrArg[0].t.start();
 #endif           
@@ -231,39 +231,39 @@ namespace ta {
                 }
                 // create lsh signatures for sample queries
                 LshIndex queryIndex;
-                queryIndex.initializeLists(xValues->size());
+                queryIndex.initializeLists(sampleSize);
 
 
 
                 double avgBlockTime = 0;
                 double min_t_b = -1;
-                int breakpoint = xValues->size() - 1;
-              
+                int breakpoint = sampleSize - 1;
 
-                for (int i = xValues->size() - 1; i >= 0; i--) {
+         
 
-                    int t = xValues->at(i).i;
-                    int ind = xValues->at(i).j;
+
+                for (int i = sampleSize - 1; i >= 0; i--) {
+
+                    int t = probeBucket.xValues->at(i).i;
+                    int ind = probeBucket.xValues->at(i).j;
                     const double* query = retrArg[t].queryMatrix->getMatrixRowPtr(ind);
 
-                    std::vector<QueueElement>& prevResults = retrArg[0].globalData[b - 1][t][ind].results; //just reading
+                    const std::vector<QueueElement>& prevResults = prevBucket.sampleThetas[t].at(ind).results; //just reading
 
-
-//                    retrArg[0].heap.assign(prevResults.begin(), prevResults.end());
                     std::copy(prevResults.begin(), prevResults.end(), retrArg[0].heap.begin());
                     std::make_heap(retrArg[0].heap.begin(), retrArg[0].heap.end(), std::greater<QueueElement>());
 
                     double minScore = retrArg[0].heap.front().data;
                     double localTheta = minScore * (minScore > 0 ? probeBucket.invNormL2.second : probeBucket.invNormL2.first);
-                    int activeBlocks = retrArg[0].findActiveBlocks(localTheta);
+                    int activeBlocks = repetitionsForTheta.findActiveBlocks(localTheta);
 
                     if (activeBlocks > LSH_SIGNATURES || activeBlocks <= 0) {
                         sampleTimes[i] = plain.sampleTimes[i];
                     } else {
 
-                        if (activeBlocks > index->initializedSketchesForIndex && i < xValues->size() - 1) {
+                        if (activeBlocks > index->initializedSketchesForIndex && i < sampleSize - 1) {
 
-                            double expectedTime = avgBlockTime * activeBlocks / (index->initializedSketchesForIndex * (xValues->size() - i));
+                            double expectedTime = avgBlockTime * activeBlocks / (index->initializedSketchesForIndex * (sampleSize - i));
 
                             if (expectedTime > avgLengthTime) {
                                 min_t_b = localTheta;
@@ -272,11 +272,11 @@ namespace ta {
                             }
                         }
                         index->checkAndReallocateAll(retrArg[0].probeMatrix, true, probeBucket.startPos, probeBucket.endPos, activeBlocks,
-                                retrArg[0].sums, retrArg[0].countsOfBlockValues, retrArg[0].sketches, retrArg[0].rig);
+                                retrArg[0].sums, retrArg[0].countsOfBlockValues, retrArg[0].sketches);
 
 
                         retrArg[0].tunerTimer.start();
-                        queryIndex.checkAndReallocateSingle(retrArg[t].queryMatrix, ind, i, activeBlocks, retrArg[0].sums, retrArg[0].rig);
+                        queryIndex.checkAndReallocateSingle(retrArg[t].queryMatrix, ind, i, activeBlocks, retrArg[0].sums);
 
                         processIndexesTopk(query, i, index, &queryIndex, activeBlocks, probeBucket, &retrArg[0]);
 
@@ -287,31 +287,33 @@ namespace ta {
                 }
 
 
-                if (breakpoint == xValues->size() - 1) { // no break at all
+                if (breakpoint == sampleSize - 1) { // no break at all
                     // compare
                     findCutOffPoint(sampleTimes, plain.sampleTimes, sampleTotalTime, t_b_indx);
 
                     if (plain.sampleTotalTime < sampleTotalTime) {
                         probeBucket.setAfterTuning(1, 1);
                     } else {
-                        double value = (t_b_indx == 0 ? -1 : xValues->at(t_b_indx).result);
+                        double value = (t_b_indx == 0 ? -1 : probeBucket.xValues->at(t_b_indx).result);
                         probeBucket.setAfterTuning(1, value);
                     }
 
                 } else {
 
-                    if (breakpoint == xValues->size() - 2) {
+                    if (breakpoint == sampleSize - 2) {
                         probeBucket.setAfterTuning(1, 1);
                     } else {
                         probeBucket.setAfterTuning(1, min_t_b);
                     }
                 }
+            } else {
+                probeBucket.setAfterTuning(prevBucket.numLists, prevBucket.t_b);
             }
-     
+
 
         }
 
-        inline virtual void runTopK(ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void runTopK(ProbeBucket& probeBucket, RetrievalArguments* arg) const{
 
             if (probeBucket.t_b == 1) {
                 plain.runTopK(probeBucket, arg);
@@ -319,7 +321,7 @@ namespace ta {
 
                 LshIndex* index = static_cast<LshIndex*> (probeBucket.getIndex(LSH));
 
-                if (!index->initialized) {
+                if (!index->isInitialized()) {
 #ifdef TIME_IT
                     arg->t.start();
 #endif           
@@ -331,9 +333,9 @@ namespace ta {
 #endif
                 }
 
-                for(auto& queryBatch: arg->queryBatches){
+                for (auto& queryBatch : arg->queryBatches) {
 
-                    if (queryBatch.inactiveCounter == queryBatch.rowNum)
+                    if (queryBatch.isWorkDone())
                         continue;
 
 #ifdef TIME_IT
@@ -356,7 +358,7 @@ namespace ta {
                     int start = queryBatch.startPos * arg->k;
                     int end = queryBatch.endPos * arg->k;
                     for (row_type i = start; i < end; i += arg->k) {
-                        if (queryBatch.inactiveQueries[user - queryBatch.startPos]) {
+                        if (queryBatch.isQueryInactive(user)) {
                             user++;
                             continue;
                         }
@@ -367,8 +369,7 @@ namespace ta {
                         double minScore = arg->topkResults[i].data;
 
                         if (probeBucket.normL2.second < minScore) {// skip this bucket and all other buckets /////////////////
-                            queryBatch.inactiveQueries[user - queryBatch.startPos] = true;
-                            queryBatch.inactiveCounter++;
+                            queryBatch.inactivateQuery(user);
                             user++;
                             continue;
                         }
@@ -390,7 +391,7 @@ namespace ta {
                             double localTheta = minScore;
 
                             localTheta = localTheta * (localTheta > 0 ? probeBucket.invNormL2.second : probeBucket.invNormL2.first);
-                            int activeBlocks = arg->findActiveBlocks(localTheta);
+                            int activeBlocks = repetitionsForTheta.findActiveBlocks(localTheta);
 
 
 
@@ -406,13 +407,15 @@ namespace ta {
                                 arg->t.start();
 #endif 
                                 if (activeBlocks > index->initializedSketchesForIndex) {
-                                    omp_set_lock(&(index->writelock));
+                                    //                                    omp_set_lock(&(index->writelock));
+                                    index->lockIndex();
                                     index->checkAndReallocateAll(arg->probeMatrix, true, probeBucket.startPos, probeBucket.endPos, activeBlocks,
-                                            arg->sums, arg->countsOfBlockValues, arg->sketches, arg->rig); // need for lock here
-                                    omp_unset_lock(&(index->writelock));
-                                }                             
+                                            arg->sums, arg->countsOfBlockValues, arg->sketches); // need for lock here
+                                    //                                    omp_unset_lock(&(index->writelock));
+                                    index->unlockIndex();
+                                }
 
-                                queryIndex->checkAndReallocateSingle(arg->queryMatrix, user, user - queryBatch.startPos, activeBlocks, arg->sums, arg->rig);
+                                queryIndex->checkAndReallocateSingle(arg->queryMatrix, user, user - queryBatch.startPos, activeBlocks, arg->sums);
 #ifdef TIME_IT
                                 arg->t.stop();
                                 arg->preprocessTime += arg->t.elapsedTime().nanos();
@@ -428,23 +431,23 @@ namespace ta {
 
                         arg->writeHeapToTopk(user);
                         user++;
-                       
+
                     }
                 }
             }
         }
 
-        inline virtual void run(ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void run(ProbeBucket& probeBucket, RetrievalArguments* arg) const{
 
             LshIndex* index = static_cast<LshIndex*> (probeBucket.getIndex(LSH));
 
-            for(auto& queryBatch: arg->queryBatches){
+            for (auto& queryBatch : arg->queryBatches) {
 
-                if (queryBatch.normL2.second < probeBucket.bucketScanThreshold) {
+                if (queryBatch.maxLength() < probeBucket.bucketScanThreshold) {
                     break;
                 }
 
-                if (probeBucket.t_b == 1 || (probeBucket.t_b * queryBatch.normL2.first > probeBucket.bucketScanThreshold)) {
+                if (probeBucket.t_b == 1 || (probeBucket.t_b * queryBatch.minLength() > probeBucket.bucketScanThreshold)) {
                     plain.run(queryBatch, probeBucket, arg);
 
                 } else { // do it per query
@@ -482,7 +485,7 @@ namespace ta {
                             arg->t.start();
 #endif
                             double localTheta = probeBucket.bucketScanThreshold / query[-1];
-                            int activeBlocks = arg->findActiveBlocks(localTheta);
+                            int activeBlocks = repetitionsForTheta.findActiveBlocks(localTheta);
 
 #ifdef TIME_IT
                             arg->t.stop();
@@ -497,15 +500,17 @@ namespace ta {
                                 arg->t.start();
 #endif  
                                 if (activeBlocks > index->initializedSketchesForIndex) {
-                                    omp_set_lock(&(index->writelock));
+                                    index->lockIndex();
+                                    //                                    omp_set_lock(&(index->writelock));
                                     index->checkAndReallocateAll(arg->probeMatrix, true, probeBucket.startPos, probeBucket.endPos, activeBlocks,
-                                            arg->sums, arg->countsOfBlockValues, arg->sketches, arg->rig); // need for lock here
-                                    omp_unset_lock(&(index->writelock));
+                                            arg->sums, arg->countsOfBlockValues, arg->sketches); // need for lock here
+                                    //                                    omp_unset_lock(&(index->writelock));
+                                    index->unlockIndex();
                                 }
 
 
 
-                                queryIndex->checkAndReallocateSingle(arg->queryMatrix, i, i - queryBatch.startPos, activeBlocks, arg->sums, arg->rig);
+                                queryIndex->checkAndReallocateSingle(arg->queryMatrix, i, i - queryBatch.startPos, activeBlocks, arg->sums);
 #ifdef TIME_IT
                                 arg->t.stop();
                                 arg->preprocessTime += arg->t.elapsedTime().nanos();

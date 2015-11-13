@@ -32,13 +32,12 @@ namespace ta {
 
         //lists is dummy
 
-        inline virtual void run(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void run(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
 
             QueueElementLists* invLists = static_cast<QueueElementLists*> (probeBucket.getIndex(SL));
 
             col_type stepOnCol = 0;
             row_type posMatrix;
-            //            bool stopFlag = false;
             double stopThreshold;
             double oldValue = 0;
             double localTheta;
@@ -56,7 +55,7 @@ namespace ta {
 #endif   
             //initialize scheduler and state          
             arg->tanraState->initForNewQuery(query);
-            stopThreshold = arg->tanraState->initializeThreshold();
+            stopThreshold = arg->tanraState->getInitialThreshold();
 #ifdef TIME_IT
             arg->t.stop();
             arg->preprocessTime += arg->t.elapsedTime().nanos();
@@ -72,8 +71,8 @@ namespace ta {
                 //choose next step
                 stepOnCol = arg->tanraState->chooseStep();
                 //pick up the item
-                oldValue = invLists->getElement(arg->tanraState->fringePos[stepOnCol])->data;
-                posMatrix = invLists->getElement(arg->tanraState->fringePos[stepOnCol])->id;
+                oldValue = invLists->getElement(arg->tanraState->getDepthInFringeInCol(stepOnCol))->data;
+                posMatrix = invLists->getElement(arg->tanraState->getDepthInFringeInCol(stepOnCol))->id;
 		row_type key = posMatrix + probeBucket.startPos;    
 	
               
@@ -116,33 +115,35 @@ namespace ta {
 
         }
 
-        inline virtual void run(QueryBucket_withTuning& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void run(QueryBatch& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
             std::cerr << "Error! You shouldn't have called that" << std::endl;
             exit(1);
         }
 
-        inline void runTopK(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline void runTopK(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
             std::cerr << "Error! You shouldn't have called that" << std::endl;
             exit(1);
         }
 
-        inline virtual void runTopK(QueryBucket_withTuning& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void runTopK(QueryBatch& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg)const {
             std::cerr << "Error! You shouldn't have called that" << std::endl;
             exit(1);
         }
 
-        inline virtual void tune(ProbeBucket& probeBucket, std::vector<RetrievalArguments>& retrArg) {
+        inline virtual void tune(ProbeBucket& probeBucket, const ProbeBucket& prevBucket, std::vector<RetrievalArguments>& retrArg) {
+            
+             row_type sampleSize = probeBucket.xValues->size();
 
-            if (xValues->size() > 0) {
-                sampleTimes.resize(xValues->size());
+            if (sampleSize > 0) {
+                sampleTimes.resize(sampleSize);
                 QueueElementLists* invLists = static_cast<QueueElementLists*> (probeBucket.getIndex(SL));
 
                 retrArg[0].tanraState->initializeForNewBucket(invLists);
 
-                for (row_type i = 0; i < xValues->size(); i++) {
+                for (row_type i = 0; i < sampleSize; i++) {
 
-                    int t = xValues->at(i).i;
-                    int ind = xValues->at(i).j;
+                    int t = probeBucket.xValues->at(i).i;
+                    int ind = probeBucket.xValues->at(i).j;
                     const double* query = retrArg[t].queryMatrix->getMatrixRowPtr(ind);
 
                     retrArg[0].tunerTimer.start();
@@ -151,36 +152,36 @@ namespace ta {
                     sampleTimes[i] = retrArg[0].tunerTimer.elapsedTime().nanos();
                 }
 
+            } else {
+                probeBucket.setAfterTuning(prevBucket.numLists, prevBucket.t_b);
             }
 
 
         }
 
-        inline virtual void tuneTopk(ProbeBucket& probeBucket, std::vector<RetrievalArguments>& retrArg) {
+        inline virtual void tuneTopk(ProbeBucket& probeBucket, const ProbeBucket& prevBucket,  std::vector<RetrievalArguments>& retrArg) {
             std::cerr << "Error! You shouldn't have called that" << std::endl;
             exit(1);
         }
 
-        inline virtual void runTopK(ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void runTopK(ProbeBucket& probeBucket, RetrievalArguments* arg)const {
             std::cerr << "Error! You shouldn't have called that" << std::endl;
             exit(1);
 
         }
 
-        inline virtual void run(ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void run(ProbeBucket& probeBucket, RetrievalArguments* arg) const{
             QueueElementLists* invLists = static_cast<QueueElementLists*> (probeBucket.getIndex(SL));
 
             arg->tanraState->initializeForNewBucket(invLists);
 
-
-
             for (row_type q = 0; q < arg->queryBatches.size(); q++) {
 
-                if (arg->queryBatches[q].normL2.second < probeBucket.bucketScanThreshold) {
+                if (arg->queryBatches[q].maxLength() < probeBucket.bucketScanThreshold) {
                     break;
                 }
 
-                QueryBucket_withTuning& queryBatch = arg->queryBatches[q];
+                QueryBatch& queryBatch = arg->queryBatches[q];
 
                 for (row_type i = queryBatch.startPos; i < queryBatch.endPos; i++) {
                     const double* query = arg->queryMatrix->getMatrixRowPtr(i);

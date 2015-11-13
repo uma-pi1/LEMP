@@ -8,8 +8,6 @@
 
 #ifndef RANDOMINTGAUSSIANS_H
 #define	RANDOMINTGAUSSIANS_H
-#include <gsl/gsl_rng.h>
-#include <gsl/gsl_randist.h>
 
 #include <boost/random.hpp>
 #include <boost/random/normal_distribution.hpp>
@@ -17,13 +15,11 @@
 
 namespace ta {
 
-    struct RandomIntGaussians {
-        //         gsl_rng *r;
 
-        boost::mt19937 rng; // I don't seed it on purpouse (it's not relevant)
+    // This is a singleton class
 
-        uint16_t* intGaussians; // dimensions x nHashes 
-        float *intToFloatCache;
+    class RandomIntGaussians {
+        boost::mt19937 rng;
 
         float leftLimit, rightLimit;
         float floatToIntFactor;
@@ -44,19 +40,11 @@ namespace ta {
 
             long s = nHashes * nDimensions; //maxHashes            
             intGaussians = new uint16_t[s];
-
-            //            r = gsl_rng_alloc(gsl_rng_taus2);
-            //            gsl_rng_set(r, 123); // very much not-random ///////////////////////////////
-
-
-            rng.seed(123);
-
-
-
+            rng.seed(123); // not that random
             int cacheSize = 65536;
             intToFloatCache = new float[cacheSize];
 
-            intToFloatCache[0] = leftLimit;    
+            intToFloatCache[0] = leftLimit;
             for (int i = 1; i < cacheSize; ++i) {
                 intToFloatCache[i] = intToFloatCache[i - 1] + intToFloatFactor;
             }
@@ -74,12 +62,7 @@ namespace ta {
 
                 for (int d = 0; d < nDimensions; ++d) {
                     long long k = d * nHashes + b;
-
-                    //                    rf = (float) gsl_ran_gaussian_ziggurat(r, 1.0);
-
                     rf = (float) var_normal();
-
-
                     if (rf < leftLimit) {
                         intGaussians[k] = (uint16_t) 0;
                         continue;
@@ -89,7 +72,6 @@ namespace ta {
                         continue;
                     }
                     intGaussians[k] = floatToInt(rf);
-
                 }
             }
 
@@ -103,17 +85,77 @@ namespace ta {
             return (uint16_t) round((a - leftLimit) * floatToIntFactor);
         }
 
+        RandomIntGaussians(const RandomIntGaussians& rhs) = delete;
+        RandomIntGaussians& operator=(const RandomIntGaussians& rhs) = delete;
+
+
+    public:
+
+        float *intToFloatCache;
+        uint16_t* intGaussians; // dimensions x nHashes
+
+        static RandomIntGaussians& getInstance(int dimensions, int numHashes) {// call as RandomIntGaussians::getInstance() gives you functionality similar to a global variable
+            static RandomIntGaussians rig(dimensions, numHashes); // static: protection from data races
+            return rig;
+        }
+
         ~RandomIntGaussians() {
             if (intGaussians != nullptr)
                 delete[] intGaussians;
-            //             gsl_rng_free(r);
             if (intToFloatCache != nullptr)
                 delete[] intToFloatCache;
         }
 
     };
 
+    class ActiveLshRepetitionsForTheta {// somehow calling function on singleton takes too much time 
+        std::vector<QueueElement> thetaRepetitions; // id: repetitions needed, double:theta
 
+
+        ActiveLshRepetitionsForTheta& operator=(const ActiveLshRepetitionsForTheta& rhs) = delete;
+        ActiveLshRepetitionsForTheta(const ActiveLshRepetitionsForTheta& rhs) = delete;
+
+    public:
+
+        ActiveLshRepetitionsForTheta() {
+        }
+
+        inline void init(double recallLevel) {
+            thetaRepetitions.reserve(LSH_SIGNATURES);
+            double logNom = log(1 - recallLevel);
+            double exponent = 1 / ((double) LSH_CODE_LENGTH); //0.125; // 1/8 LSH_CODE_LENGTH
+
+            for (int b = 0; b < LSH_SIGNATURES; ++b) {
+                double logDenom = logNom / (b + 1);
+                double denom = exp(logDenom);
+                double thres8 = 1 - denom;
+                double thres = pow(thres8, exponent);
+                double acosThres = (1 - thres) * PI;
+                double theta = cos(acosThres);
+
+                thetaRepetitions.emplace_back(theta, b + 1);
+            }
+            std::sort(thetaRepetitions.begin(), thetaRepetitions.end(), std::less<QueueElement>());
+        }
+
+        inline int findActiveBlocks(double theta) {
+            auto it = std::upper_bound(thetaRepetitions.begin(), thetaRepetitions.end(), QueueElement(theta, 0));
+
+            int pos = it - thetaRepetitions.begin();
+            if (pos >= thetaRepetitions.size()) {
+                pos = thetaRepetitions.size() - 1;
+                return thetaRepetitions[pos].id;
+            }
+
+            int b = thetaRepetitions[pos].id + 1;
+            return b;
+        }
+
+
+    };
+
+
+    ActiveLshRepetitionsForTheta repetitionsForTheta;
 
 
 }

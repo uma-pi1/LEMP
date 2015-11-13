@@ -38,73 +38,79 @@ namespace ta {
             return &plainRetriever;
         }
 
-        inline virtual void run(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void run(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg)const {
             std::cout << "You should not call run for single query on LEMP_LI" << std::endl;
             exit(1);
         }
 
-        inline virtual void run(QueryBucket_withTuning& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void run(QueryBatch& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg)const {
             std::cout << "You should not call run for single query on LEMP_LI" << std::endl;
             exit(1);
         }
 
-        inline virtual void runTopK(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void runTopK(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg)const {
             std::cout << "You should not call run for single query on LEMP_LI" << std::endl;
             exit(1);
         }
 
-        inline virtual void runTopK(QueryBucket_withTuning& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void runTopK(QueryBatch& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg)const {
             std::cout << "You should not call run for single query on LEMP_LI" << std::endl;
             exit(1);
         }
 
-        inline virtual void tune(ProbeBucket& probeBucket, std::vector<RetrievalArguments>& retrArg) {
+        inline virtual void tune(ProbeBucket& probeBucket, const ProbeBucket& prevBucket, std::vector<RetrievalArguments>& retrArg) {
 
-            if (xValues->size() > 0) {
+            if (probeBucket.xValues->size() > 0) {
 
-                plainRetriever.xValues = xValues;
-                otherRetriever.xValues = xValues;
-
-                plainRetriever.tune(probeBucket, retrArg);
+                plainRetriever.tune(probeBucket, prevBucket, retrArg);
                 retrArg[0].competitorMethod = &plainRetriever.sampleTimes;
-                otherRetriever.tune(probeBucket, retrArg);
+                otherRetriever.tune(probeBucket, prevBucket, retrArg);
 
                 if (plainRetriever.sampleTotalTime < otherRetriever.dataForTuning.bestTime) {
                     probeBucket.setAfterTuning(1, 1);
                 } else {
-                    double value = (otherRetriever.dataForTuning.t_b_indx == 0 ? -1 : xValues->at(otherRetriever.dataForTuning.t_b_indx).result);
+                    double value = (otherRetriever.dataForTuning.t_b_indx == 0 ? -1 : probeBucket.xValues->at(otherRetriever.dataForTuning.t_b_indx).result);
                     probeBucket.setAfterTuning(otherRetriever.dataForTuning.bestPhi + 1, value);
                 }
-            }
-        }
-
-        inline virtual void tuneTopk(ProbeBucket& probeBucket, std::vector<RetrievalArguments>& retrArg) {
-
-            row_type b = retrArg[0].bucketInd;
-
-            otherRetriever.xValues = xValues;
-            plainRetriever.sampleTimes.reserve(xValues->size());
-
-            for (row_type i = 0; i < xValues->size(); ++i) {
-                int t = xValues->at(i).i;
-                int ind = xValues->at(i).j;
-
-                plainRetriever.sampleTimes.push_back(retrArg[0].globalData[b][t][ind].lengthTime);
-                plainRetriever.sampleTotalTime += retrArg[0].globalData[b][t][ind].lengthTime;
-            }
-            retrArg[0].competitorMethod = &plainRetriever.sampleTimes;
-
-            otherRetriever.tuneTopk(probeBucket, retrArg);
-
-            if (plainRetriever.sampleTotalTime < otherRetriever.dataForTuning.bestTime) {
-                probeBucket.setAfterTuning(1, 1);
             } else {
-                double value = (otherRetriever.dataForTuning.t_b_indx == 0 ? -1 : xValues->at(otherRetriever.dataForTuning.t_b_indx).result);
-                probeBucket.setAfterTuning(otherRetriever.dataForTuning.bestPhi + 1, value);
+                probeBucket.setAfterTuning(prevBucket.numLists, prevBucket.t_b);
             }
         }
 
-        inline virtual void runTopK(ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void tuneTopk(ProbeBucket& probeBucket, const ProbeBucket& prevBucket, std::vector<RetrievalArguments>& retrArg) {
+            row_type sampleSize = (probeBucket.xValues!=nullptr ? probeBucket.xValues->size() : 0);
+            
+            
+            
+
+            if (sampleSize > 0) {
+                plainRetriever.sampleTimes.reserve(sampleSize);
+
+                for (row_type i = 0; i < sampleSize; ++i) {
+                    int t = probeBucket.xValues->at(i).i;
+                    int ind = probeBucket.xValues->at(i).j;
+
+                    plainRetriever.sampleTimes.push_back(probeBucket.sampleThetas[t][ind].lengthTime);
+                    plainRetriever.sampleTotalTime += probeBucket.sampleThetas[t][ind].lengthTime;
+                }
+                retrArg[0].competitorMethod = &plainRetriever.sampleTimes;
+
+                otherRetriever.tuneTopk(probeBucket, prevBucket, retrArg);
+
+                if (plainRetriever.sampleTotalTime < otherRetriever.dataForTuning.bestTime) {
+                    probeBucket.setAfterTuning(1, 1);
+                } else {
+                    double value = (otherRetriever.dataForTuning.t_b_indx == 0 ? -1 : probeBucket.xValues->at(otherRetriever.dataForTuning.t_b_indx).result);
+                    probeBucket.setAfterTuning(otherRetriever.dataForTuning.bestPhi + 1, value);
+                }
+
+            } else {
+                probeBucket.setAfterTuning(prevBucket.numLists, prevBucket.t_b);
+            }
+
+        }
+
+        inline virtual void runTopK(ProbeBucket& probeBucket, RetrievalArguments* arg) const{
 
 
             if (probeBucket.t_b == 1) {
@@ -114,7 +120,7 @@ namespace ta {
 
                 for (auto& queryBatch : arg->queryBatches) {
 
-                    if (queryBatch.inactiveCounter == queryBatch.rowNum)
+                    if (queryBatch.isWorkDone())
                         continue;
 
                     row_type user = queryBatch.startPos;
@@ -122,7 +128,7 @@ namespace ta {
                     int end = queryBatch.endPos * arg->k;
                     for (row_type i = start; i < end; i += arg->k) {
 
-                        if (queryBatch.inactiveQueries[user - queryBatch.startPos]) {
+                        if (queryBatch.isQueryInactive(user)) {
                             user++;
                             continue;
                         }
@@ -152,8 +158,7 @@ namespace ta {
 
 
                         if (probeBucket.normL2.second < minScoreAppr) {// skip this bucket and all other buckets
-                            queryBatch.inactiveQueries[user - queryBatch.startPos] = true;
-                            queryBatch.inactiveCounter++;
+                            queryBatch.inactivateQuery(user);
                             user++;
                             continue;
                         }
@@ -170,9 +175,8 @@ namespace ta {
                             arg->t.start();
 #endif
                             // this can go out of th loop. I run incr for all
-                            if (!queryBatch.initializedQueues) { //preprocess
+                            if (!queryBatch.hasInitializedQueues()) { //preprocess
                                 queryBatch.preprocess(*(arg->queryMatrix), arg->maxLists);
-                                queryBatch.initializedQueues = true;
                             }
 #ifdef TIME_IT
                             arg->t.stop();
@@ -192,18 +196,18 @@ namespace ta {
             }
         }
 
-        inline virtual void run(ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void run(ProbeBucket& probeBucket, RetrievalArguments* arg) const{
             arg->numLists = probeBucket.numLists;
-            
+
             for (auto& queryBatch : arg->queryBatches) {
 
-                if (queryBatch.normL2.second < probeBucket.bucketScanThreshold) {
+                if (queryBatch.maxLength() < probeBucket.bucketScanThreshold) {
                     break;
                 }
 
-                if (probeBucket.t_b == 1 || (probeBucket.t_b * queryBatch.normL2.first > probeBucket.bucketScanThreshold)) {
+                if (probeBucket.t_b == 1 || (probeBucket.t_b * queryBatch.minLength() > probeBucket.bucketScanThreshold)) {
                     plainRetriever.run(queryBatch, probeBucket, arg);
-                } else if (probeBucket.t_b * queryBatch.normL2.second <= probeBucket.bucketScanThreshold) {
+                } else if (probeBucket.t_b * queryBatch.maxLength() <= probeBucket.bucketScanThreshold) {
                     otherRetriever.run(queryBatch, probeBucket, arg);
                 } else { // do it per query
 
@@ -211,9 +215,8 @@ namespace ta {
                     arg->t.start();
 #endif
 
-                    if (!queryBatch.initializedQueues) { //preprocess
+                    if (!queryBatch.hasInitializedQueues()) { //preprocess
                         queryBatch.preprocess(*(arg->queryMatrix), arg->maxLists);
-                        queryBatch.initializedQueues = true;
 
                     }
 #ifdef TIME_IT

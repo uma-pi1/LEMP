@@ -53,7 +53,7 @@
 #include <taLib/structs/TreeIndex.h>
 #include <taLib/structs/Candidates.h>
 #include <taLib/structs/TAState.h>
-#include <taLib/structs/TANRAState2.h>
+#include <taLib/structs/TANRAState.h>
 #include <taLib/structs/RetrievalArguments.h>//////////////////////
 #include <taLib/structs/QueryBatch.h>
 #include <taLib/structs/ProbeBucket.h>

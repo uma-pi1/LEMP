@@ -59,10 +59,7 @@ namespace ta {
 
     }
 
-    inline void verifyCandidatesTopK_noLengthTest(const double * query,
-            row_type numCandidatesToVerify, RetrievalArguments* arg) {
-
-
+    inline void verifyCandidatesTopK_noLengthTest(const double * query,row_type numCandidatesToVerify, RetrievalArguments* arg) {
 
         double minScore = arg->heap.front().data;
 
@@ -82,8 +79,7 @@ namespace ta {
 
     }
 
-    inline void verifyCandidatesTopK_lengthTest(const double * query,
-            row_type numCandidatesToVerify,  RetrievalArguments* arg) {
+    inline void verifyCandidatesTopK_lengthTest(const double * query, row_type numCandidatesToVerify,  RetrievalArguments* arg) {
 
 
         double minScore = arg->heap.front().data;

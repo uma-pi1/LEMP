@@ -37,32 +37,32 @@ using namespace rg;
 int main() {
 
     LEMPArg args;
-    args.theta = 0.035;
-    //       args.k = 10;
-    //        args.querySideLeft = false;
-    args.method = LEMP_LI;
+//    args.theta = 0.035;
+               args.k = 10;
+//                args.querySideLeft = false;
+    args.method = LEMP_LSH;
     args.cacheSizeinKB = 2048;
     args.threads = 1;
     args.R = 0.5;
     args.isTARR = true;
-    args.r = 50;
-    args.m = 771611;
-    args.n = 132209;
-           
+    //    args.r = 50;
+    //    args.m = 771611;
+    //    args.n = 132209;
 
 
-//    args.usersFile = "/home/chteflio/data/ta-data/w-50-gnmf-zero.mma";
-//    args.itemsFile = "/home/chteflio/data/ta-data/h-50-gnmf-zero.mma";
 
-    args.usersFile = "/home/chteflio/chteflioInMPI/data/ta-data/w-50-gnmf-zero.csv";
-    args.itemsFile = "/home/chteflio/chteflioInMPI/data/ta-data/h-50-gnmf-zero.csv";
+    //    args.usersFile = "/home/chteflio/data/ta-data/w-50-gnmf-zero.mma";
+    //    args.itemsFile = "/home/chteflio/data/ta-data/h-50-gnmf-zero.mma";
 
-    //     args.usersFile = "/home/chteflio/chteflioInMPI/data/ta-data/w50-net-noav.mma";
-    //     args.itemsFile = "/home/chteflio/chteflioInMPI/data/ta-data/h50-net-noav.mma";
+        args.usersFile = "/home/chteflio/chteflioInMPI/data/ta-data/w-gnmf-sample.mma";
+        args.itemsFile = "/home/chteflio/chteflioInMPI/data/ta-data/h-gnmf-sample.mma";
+
+//    args.usersFile = "/home/chteflio/chteflioInMPI/data/ta-data/w50-net-noav.mma";
+//    args.itemsFile = "/home/chteflio/chteflioInMPI/data/ta-data/h50-net-noav.mma";
 
 
     args.logFile = "/home/chteflio/workspace/Log.txt";
-    //    args.resultsFile = "/home/chteflio/data/test.data";
+    args.resultsFile = "/home/chteflio/data/test.data";
 
     ta::Algo_withTuning algo(args);
 

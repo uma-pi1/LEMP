@@ -56,37 +56,38 @@ namespace ta {
 
         // arg should point to the correct tree
 
-        inline virtual void run(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void run(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
 
             fastmks->SearchForTheta(arg->theta, arg->tree->tree, arg->probeMatrix, arg->queryMatrix, arg->results, arg->queryPos, arg->comparisons, arg->threads);
         }
 
-        inline virtual void run(QueryBucket_withTuning& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void run(QueryBatch& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
             std::cerr << "Error! You shouldn't have called that" << std::endl;
             exit(1);
         }
 
-        inline virtual void runTopK(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void runTopK(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
             fastmks->Search(arg->k, arg->tree->tree, arg->probeMatrix, arg->queryMatrix, arg->heap, arg->queryPos, arg->comparisons, arg->threads);
         }
 
-        // this is to be used only by the 1st bucket in Row-Top-k. It just initializes the top-k elements
+        // this is to be used only by the 1st bucket in Row-Top-k. It just QueryBatchializes the top-k elements
 
-        inline virtual void runTopK(QueryBucket_withTuning& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void runTopK(QueryBatch& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
             std::cerr << "Error! You shouldn't have called that" << std::endl;
             exit(1);
         }
 
-        inline virtual void tune(ProbeBucket& probeBucket, std::vector<RetrievalArguments>& retrArg) {
-            if (xValues->size() > 0) {
-                sampleTimes.resize(xValues->size());
+        inline virtual void tune(ProbeBucket& probeBucket, const ProbeBucket& prevBucket, std::vector<RetrievalArguments>& retrArg) {
+            row_type sampleSize = probeBucket.xValues->size();
+            if (sampleSize > 0) {
+                sampleTimes.resize(sampleSize);
 
                 TreeIndex * index = static_cast<TreeIndex*> (probeBucket.ptrIndexes[TREE]);
 
-                for (row_type i = 0; i < xValues->size(); ++i) {
+                for (row_type i = 0; i < sampleSize; ++i) {
 
-                    int t = xValues->at(i).i;
-                    int ind = xValues->at(i).j;
+                    int t = probeBucket.xValues->at(i).i;
+                    int ind = probeBucket.xValues->at(i).j;
 
                     retrArg[t].tunerTimer.start();
                     fastmks->SearchForTheta(retrArg[t].theta, index->tree, retrArg[t].probeMatrix, retrArg[t].queryMatrix, retrArg[t].results, ind, retrArg[t].comparisons, 1);
@@ -94,21 +95,25 @@ namespace ta {
                     sampleTimes[i] = retrArg[t].tunerTimer.elapsedTime().nanos();
                 }
 
+            } else {
+                probeBucket.setAfterTuning(prevBucket.numLists, prevBucket.t_b);
             }
         }
 
-        inline virtual void tuneTopk(ProbeBucket& probeBucket, std::vector<RetrievalArguments>& retrArg) {
-            row_type b = retrArg[0].bucketInd;
+        inline virtual void tuneTopk(ProbeBucket& probeBucket, const ProbeBucket& prevBucket, std::vector<RetrievalArguments>& retrArg) {
 
-            if (xValues->size() > 0) {
-                sampleTimes.resize(xValues->size());
+            row_type sampleSize = (probeBucket.xValues!=nullptr ? probeBucket.xValues->size() : 0);
+            
+
+            if (sampleSize > 0) {
+                sampleTimes.resize(sampleSize);
                 TreeIndex * index = static_cast<TreeIndex*> (probeBucket.ptrIndexes[TREE]);
 
-                for (row_type i = 0; i < xValues->size(); ++i) {
-                    int t = xValues->at(i).i;
-                    int ind = xValues->at(i).j;
+                for (row_type i = 0; i < sampleSize; ++i) {
+                    int t = probeBucket.xValues->at(i).i;
+                    int ind = probeBucket.xValues->at(i).j;
 
-                    std::vector<QueueElement>& prevResults = retrArg[0].globalData[b - 1][t][ind].results;
+                    const std::vector<QueueElement>& prevResults = prevBucket.sampleThetas[t].at(ind).results;
 
                     retrArg[0].heap.assign(prevResults.begin(), prevResults.end());
                     std::make_heap(retrArg[0].heap.begin(), retrArg[0].heap.end(), std::greater<QueueElement>());
@@ -118,20 +123,22 @@ namespace ta {
                     retrArg[0].tunerTimer.stop();
                     sampleTimes[i] = retrArg[0].tunerTimer.elapsedTime().nanos();
                 }
+            }else {
+                probeBucket.setAfterTuning(prevBucket.numLists, prevBucket.t_b);
             }
         }
 
-        inline virtual void runTopK(ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void runTopK(ProbeBucket& probeBucket, RetrievalArguments* arg) const{
 
             TreeIndex * index = static_cast<TreeIndex*> (probeBucket.ptrIndexes[TREE]);
 
 
             for (auto& queryBatch : arg->queryBatches) {
 
-                if (queryBatch.inactiveCounter == queryBatch.rowNum)
+                if (queryBatch.isWorkDone())
                     continue;
 
-                if (!index->initialized) {
+                if (!index->isInitialized()) {
                     index->initializeTree(*(arg->probeMatrix), arg->threads, probeBucket.startPos, probeBucket.endPos);
                 }
 
@@ -140,7 +147,7 @@ namespace ta {
                 int end = queryBatch.endPos * arg->k;
                 for (row_type i = start; i < end; i += arg->k) {
 
-                    if (queryBatch.inactiveQueries[user - queryBatch.startPos]) {
+                    if (queryBatch.isQueryInactive(user)) {
                         user++;
                         continue;
                     }
@@ -148,8 +155,7 @@ namespace ta {
                     double minScore = arg->topkResults[i].data;
 
                     if (probeBucket.normL2.second < minScore) {// skip this bucket and all other buckets
-                        queryBatch.inactiveQueries[user - queryBatch.startPos] = true;
-                        queryBatch.inactiveCounter++;
+                        queryBatch.inactivateQuery(user);
                         user++;
                         continue;
                     }
@@ -165,13 +171,13 @@ namespace ta {
 
         }
 
-        inline virtual void run(ProbeBucket& probeBucket, RetrievalArguments* arg) {
+        inline virtual void run(ProbeBucket& probeBucket, RetrievalArguments* arg) const{
 
             TreeIndex * index = static_cast<TreeIndex*> (probeBucket.ptrIndexes[TREE]);
 
             for (auto& queryBatch : arg->queryBatches) {
 
-                if (queryBatch.normL2.second < probeBucket.bucketScanThreshold) {
+                if (queryBatch.maxLength() < probeBucket.bucketScanThreshold) {
                     break;
                 }
 

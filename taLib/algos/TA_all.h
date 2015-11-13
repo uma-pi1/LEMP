@@ -70,6 +70,9 @@ namespace ta {
             std::cout << "Threads: " << args.threads << std::endl;
 
             retrArg = new RetrievalArguments(probeMatrix.colNum, &queryMatrix, &probeMatrix, LEMP_TA, false, args.isTARR);
+            
+    
+            
             retrArg->k = args.k;
             retrArg->theta = args.theta;
 
@@ -90,19 +93,24 @@ namespace ta {
             } else {
                 probeBucketK.init(probeMatrix, 0, args.k, args);
                 probeBucket.init(probeMatrix, args.k, probeMatrix.rowNum, args); // initialize
+                
 
                 retriever_ptr firstPtr(new Retriever());
                 probeBucketK.ptrRetriever = firstPtr;
+                
 
                 retriever_ptr rPtr(new taRetriever());
                 probeBucket.ptrRetriever = rPtr;
                 if (probeBucket.ptrIndexes[SL] == 0)
                     probeBucket.ptrIndexes[SL] = new QueueElementLists();
-
+                
                 static_cast<QueueElementLists*> (probeBucket.ptrIndexes[SL])->initializeLists(probeMatrix, args.k, probeMatrix.rowNum);
+                
+                
             }
             t.stop();
             dataManipulationTime += t.elapsedTime().nanos();
+            
 
             logging << "TA_all";
 
