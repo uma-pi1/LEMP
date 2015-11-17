@@ -195,6 +195,10 @@ namespace ta {
             }
 
         }
+               inline virtual void cleanupAfterTuning() {
+            std::cerr << "Error! You shouldn't have called that" << std::endl;
+            exit(1);
+        }
 
     };
 

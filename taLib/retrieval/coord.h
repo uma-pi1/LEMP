@@ -26,7 +26,7 @@ namespace ta {
 
     class CoordRetriever : public Retriever {
     public:
-        ListTuneData dataForTuning;
+        std::unique_ptr<ListTuneData> dataForTuning;
 
         CoordRetriever() = default;
         ~CoordRetriever() = default;
@@ -254,7 +254,8 @@ namespace ta {
         inline virtual void tune(ProbeBucket& probeBucket, const ProbeBucket& prevBucket, std::vector<RetrievalArguments>& retrArg) {
 
             if (probeBucket.xValues->size() > 0) {
-                dataForTuning.tune(probeBucket, prevBucket, retrArg, this);
+                dataForTuning = std::unique_ptr<ListTuneData>(new ListTuneData());
+                dataForTuning->tune(probeBucket, prevBucket, retrArg, this);
             } else {
                 probeBucket.setAfterTuning(prevBucket.numLists, prevBucket.t_b);
             }
@@ -263,7 +264,8 @@ namespace ta {
         inline virtual void tuneTopk(ProbeBucket& probeBucket, const ProbeBucket& prevBucket, std::vector<RetrievalArguments>& retrArg) {
             row_type sampleSize = (probeBucket.xValues != nullptr ? probeBucket.xValues->size() : 0);
             if (sampleSize > 0) {
-                dataForTuning.tuneTopk(probeBucket, prevBucket, retrArg, this);
+                dataForTuning = std::unique_ptr<ListTuneData>(new ListTuneData());
+                dataForTuning->tuneTopk(probeBucket, prevBucket, retrArg, this);
             } else {
                 probeBucket.setAfterTuning(prevBucket.numLists, prevBucket.t_b);
             }
@@ -356,7 +358,9 @@ namespace ta {
             }
 
         }
-
+       inline virtual void cleanupAfterTuning() {
+           dataForTuning.reset(nullptr);
+        }
 
 
     };

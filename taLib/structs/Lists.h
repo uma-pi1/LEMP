@@ -27,7 +27,7 @@ namespace ta {
 
     class Index {
     protected:
-        omp_lock_t writelock;
+        omp_lock_t writelock;       
         bool initialized;
     public:
 

@@ -26,14 +26,16 @@
 namespace ta {
 
 
-    typedef boost::shared_ptr< std::vector<MatItem> > xValues_ptr;
-
+    
 
     class LshIndex : public Index {
-    public:
         CosineSketches* cosSketches;
         LshBins* lshBins;
         std::vector<row_type> initializedSketches;
+        row_type nVectors;
+        
+    public:       
+        
         row_type initializedSketchesForIndex;
 
         inline LshIndex() : initializedSketchesForIndex(0), cosSketches(nullptr), lshBins(nullptr) {
@@ -80,14 +82,23 @@ namespace ta {
                 row_type endBlock = activeBuckets;
                 double* vec = matrix->getMatrixRowPtr(posInMatrix);
 
-                row_type startOffset = cosSketches->bytesPerCode * startBlock;
-                row_type startHashBit = startBlock * cosSketches->hashCodeLength;
-                row_type endHashBit = endBlock * cosSketches->hashCodeLength;
+                row_type startOffset = coreLshInfo.bytesPerCode * startBlock;
+                row_type startHashBit = startBlock * coreLshInfo.hashCodeLength;
+                row_type endHashBit = endBlock * coreLshInfo.hashCodeLength;
 
                 cosSketches->buildSingle(vec, posInBucket, matrix->colNum, sums, cosSketches->sketches, startBlock, endBlock, startHashBit, endHashBit, startOffset);
                 initializedSketches[posInBucket] = endBlock;
 
             }
+        }
+
+        inline void getCandidates(uint8_t* querySketches, row_type queryPos, row_type* candidatesToVerify, row_type& numCandidatesToVerify,
+                boost::dynamic_bitset<>& done, row_type activeBlocks, row_type probeBucketStartPos) {
+            lshBins->getCandidates(querySketches, queryPos, candidatesToVerify, numCandidatesToVerify, done, activeBlocks, probeBucketStartPos);
+        }
+        
+        inline uint8_t* getSketch(){
+            return cosSketches->sketches;
         }
 
         /* Both for queries and probe vectors
@@ -99,12 +110,12 @@ namespace ta {
             if (!initialized) {
 
                 end = (end == 0 ? matrix.rowNum : end);
-                row_type nVectors = end - start;
-                cosSketches = new CosineSketches(nVectors, LSH_CODE_LENGTH, LSH_SIGNATURES);
+                nVectors = end - start;
+                cosSketches = new CosineSketches();
 
                 if (!forProbeVectors) {
                     initializedSketches.resize(nVectors, 0);
-                    cosSketches->alloc();
+                    cosSketches->alloc(nVectors);
                 } else {
 
                     switch (LSH_CODE_LENGTH) {
@@ -121,38 +132,39 @@ namespace ta {
                         default:
                             lshBins = new LshBinsSparse<uint64_t>();
                             break;
-                    }                    
+                    }
 
-                    lshBins->init(cosSketches->bytesPerCode, cosSketches->numHashTables, cosSketches->nVectors);
+                    lshBins->init(nVectors);
                 }
                 initialized = true;
 
             }
             omp_unset_lock(&writelock);
         }
-        
+
+
+
         // for runLSH_all queries
+
         inline void initializeLists(const VectorMatrix& matrix) {
 
             omp_set_lock(&writelock);
 
             if (!initialized) {
-                row_type nVectors = matrix.rowNum;
-                cosSketches = new CosineSketches(nVectors, LSH_CODE_LENGTH, LSH_SIGNATURES);                
+                nVectors = matrix.rowNum;
+                cosSketches = new CosineSketches();
                 initialized = true;
             }
             omp_unset_lock(&writelock);
         }
-        
-        
 
         /*
          * this is for calling while tuning and only for the queries. No need to lock
          */
         inline void initializeLists(row_type sampleSize) {
             initializedSketches.resize(sampleSize, 0);
-            cosSketches = new CosineSketches(sampleSize, LSH_CODE_LENGTH, LSH_SIGNATURES);
-            cosSketches->alloc();
+            cosSketches = new CosineSketches();
+            cosSketches->alloc(sampleSize);
             initialized = true;
         }
 

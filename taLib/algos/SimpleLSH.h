@@ -18,6 +18,7 @@ namespace ta {
         rg::Timer t;
         std::shared_ptr<VectorMatrix> queryMatrix, probeMatrix;
         ProbeBucket probeBucket, probeBucketK;
+   
 
         std::vector< MatItem >* thetaResults; // for a specific query holds the itemIDs + the score
         std::vector<QueueElement> * topkResults;
@@ -143,7 +144,7 @@ namespace ta {
 
             row_type numCandidatesToVerify = 0;
 
-            index->lshBins->getCandidates(queryIndex->cosSketches->sketches, queryId, arg->candidatesToVerify, numCandidatesToVerify,
+            index->getCandidates(queryIndex->getSketch(), queryId, arg->candidatesToVerify, numCandidatesToVerify,
                     arg->done, LSH_SIGNATURES, probeBucket.startPos);
             verifyCandidatesTopK_noLengthTest(query, numCandidatesToVerify, arg);
         }

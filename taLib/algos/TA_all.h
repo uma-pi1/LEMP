@@ -35,6 +35,8 @@ namespace ta {
 
         std::vector< MatItem >* thetaResults; // for a specific query holds the itemIDs + the score
         std::vector<QueueElement> * topkResults;
+        
+        std::unique_ptr<Retriever> ptrMain;
 
 
         LEMPArg args;
@@ -43,7 +45,7 @@ namespace ta {
 
         double dataManipulationTime;
 
-        inline TA_all(LEMPArg& args) : args(args), dataManipulationTime(0) {
+        inline TA_all(LEMPArg& args) : args(args), dataManipulationTime(0), ptrMain(new taRetriever()) {
 
              if (args.querySideLeft) {
                 queryMatrix.readFromFile(args.usersFile, args.r, args.m, true);
@@ -82,9 +84,7 @@ namespace ta {
             if (args.k == 0) {
                 probeBucket.init(probeMatrix, 0, probeMatrix.rowNum, args); // initialize
                 probeBucket.bucketScanThreshold = args.theta / probeBucket.normL2.second;
-
-                retriever_ptr rPtr(new taRetriever());
-                probeBucket.ptrRetriever = rPtr;
+           
                 if (probeBucket.ptrIndexes[SL] == 0)
                     probeBucket.ptrIndexes[SL] = new QueueElementLists();
 
@@ -93,14 +93,7 @@ namespace ta {
             } else {
                 probeBucketK.init(probeMatrix, 0, args.k, args);
                 probeBucket.init(probeMatrix, args.k, probeMatrix.rowNum, args); // initialize
-                
-
-                retriever_ptr firstPtr(new Retriever());
-                probeBucketK.ptrRetriever = firstPtr;
-                
-
-                retriever_ptr rPtr(new taRetriever());
-                probeBucket.ptrRetriever = rPtr;
+                       
                 if (probeBucket.ptrIndexes[SL] == 0)
                     probeBucket.ptrIndexes[SL] = new QueueElementLists();
                 
@@ -133,7 +126,7 @@ namespace ta {
             for (row_type i = 0; i < queryMatrix.rowNum; i++) {
                 const double* query = queryMatrix.getMatrixRowPtr(i);
                 retrArg->queryId = i;
-                probeBucket.ptrRetriever->run(query, probeBucket, retrArg);
+                ptrMain->run(query, probeBucket, retrArg);
             }
             thetaResults = &(retrArg->results);
             t.stop();
@@ -178,7 +171,7 @@ namespace ta {
                 }
 
                 std::make_heap(retrArg->heap.begin(), retrArg->heap.end(), std::greater<QueueElement>()); //make the heap;
-                probeBucket.ptrRetriever->runTopK(query, probeBucket, retrArg);
+                ptrMain->runTopK(query, probeBucket, retrArg);
                 retrArg->writeHeapToTopk(i);
 
             }

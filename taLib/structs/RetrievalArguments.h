@@ -14,8 +14,6 @@
 
 namespace ta {
 
-    typedef boost::shared_ptr< std::vector<MatItem> > xValues_ptr; // data: localTheta i: thread j: posInMatrix
-
     struct RetrievalArguments {
         std::vector<IntervalElement> intervals;
         std::vector<MatItem > results;

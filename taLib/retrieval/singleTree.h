@@ -113,7 +113,7 @@ namespace ta {
                     int t = probeBucket.xValues->at(i).i;
                     int ind = probeBucket.xValues->at(i).j;
 
-                    const std::vector<QueueElement>& prevResults = prevBucket.sampleThetas[t].at(ind).results;
+                    const std::vector<QueueElement>& prevResults = prevBucket.sampleThetas->at(t).at(ind).results;
 
                     retrArg[0].heap.assign(prevResults.begin(), prevResults.end());
                     std::make_heap(retrArg[0].heap.begin(), retrArg[0].heap.end(), std::greater<QueueElement>());
@@ -190,6 +190,11 @@ namespace ta {
                     fastmks->SearchForTheta(arg->theta, index->tree, arg->probeMatrix, arg->queryMatrix, arg->results, i, arg->comparisons, arg->threads);
                 }
             }
+        }
+        
+               inline virtual void cleanupAfterTuning() {
+            std::cerr << "Error! You shouldn't have called that" << std::endl;
+            exit(1);
         }
 
 

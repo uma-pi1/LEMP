@@ -37,7 +37,8 @@ namespace ta {
 #ifdef TIME_IT 
             arg->t.start();
 #endif
-            index->lshBins->getCandidates(queryIndex->cosSketches->sketches, queryId, arg->candidatesToVerify, numCandidatesToVerify,
+
+            index->getCandidates(queryIndex->getSketch(), queryId, arg->candidatesToVerify, numCandidatesToVerify,
                     arg->done, activeBlocks, probeBucket.startPos);
 
 #ifdef TIME_IT
@@ -55,7 +56,7 @@ namespace ta {
 
         inline void processIndexes(const double * query, row_type queryId,
                 LshIndex* index, LshIndex* queryIndex, int activeBlocks,
-                ProbeBucket& probeBucket, RetrievalArguments* arg) const{
+                ProbeBucket& probeBucket, RetrievalArguments* arg) const {
 
 
             row_type numCandidatesToVerify = 0;
@@ -63,7 +64,7 @@ namespace ta {
             arg->t.start();
 #endif
 
-            index->lshBins->getCandidates(queryIndex->cosSketches->sketches, queryId, arg->candidatesToVerify, numCandidatesToVerify,
+            index->getCandidates(queryIndex->getSketch(), queryId, arg->candidatesToVerify, numCandidatesToVerify,
                     arg->done, activeBlocks, probeBucket.startPos);
 
 #ifdef TIME_IT
@@ -87,10 +88,10 @@ namespace ta {
 
         ~LshRetriever() = default;
 
-        inline virtual void run(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
+        inline virtual void run(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) const {
         }
 
-        inline virtual void run(QueryBatch& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
+        inline virtual void run(QueryBatch& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) const {
             std::cerr << "Error! You shouldn't have called that" << std::endl;
             exit(1);
         }
@@ -164,7 +165,7 @@ namespace ta {
 
                         retrArg[0].tunerTimer.start();
                         queryIndex.checkAndReallocateSingle(retrArg[t].queryMatrix, ind, i, activeBlocks, retrArg[t].sums);
-                        ;
+                       
                         processIndexes(query, i, index, &queryIndex, activeBlocks, probeBucket, &retrArg[0]);
                         retrArg[0].tunerTimer.stop();
                         sampleTimes[i] = retrArg[0].tunerTimer.elapsedTime().nanos();
@@ -208,8 +209,8 @@ namespace ta {
                     int t = probeBucket.xValues->at(i).i;
                     int ind = probeBucket.xValues->at(i).j;
 
-                    plain.sampleTimes.emplace_back(probeBucket.sampleThetas[t][ind].lengthTime);
-                    plain.sampleTotalTime += probeBucket.sampleThetas[t][ind].lengthTime;
+                    plain.sampleTimes.emplace_back(probeBucket.sampleThetas->at(t)[ind].lengthTime);
+                    plain.sampleTotalTime += probeBucket.sampleThetas->at(t)[ind].lengthTime;
                 }
 
                 double avgLengthTime = plain.sampleTotalTime / sampleSize;
@@ -239,7 +240,7 @@ namespace ta {
                 double min_t_b = -1;
                 int breakpoint = sampleSize - 1;
 
-         
+
 
 
                 for (int i = sampleSize - 1; i >= 0; i--) {
@@ -248,7 +249,7 @@ namespace ta {
                     int ind = probeBucket.xValues->at(i).j;
                     const double* query = retrArg[t].queryMatrix->getMatrixRowPtr(ind);
 
-                    const std::vector<QueueElement>& prevResults = prevBucket.sampleThetas[t].at(ind).results; //just reading
+                    const std::vector<QueueElement>& prevResults = prevBucket.sampleThetas->at(t).at(ind).results; //just reading
 
                     std::copy(prevResults.begin(), prevResults.end(), retrArg[0].heap.begin());
                     std::make_heap(retrArg[0].heap.begin(), retrArg[0].heap.end(), std::greater<QueueElement>());
@@ -313,7 +314,7 @@ namespace ta {
 
         }
 
-        inline virtual void runTopK(ProbeBucket& probeBucket, RetrievalArguments* arg) const{
+        inline virtual void runTopK(ProbeBucket& probeBucket, RetrievalArguments* arg) const {
 
             if (probeBucket.t_b == 1) {
                 plain.runTopK(probeBucket, arg);
@@ -407,11 +408,9 @@ namespace ta {
                                 arg->t.start();
 #endif 
                                 if (activeBlocks > index->initializedSketchesForIndex) {
-                                    //                                    omp_set_lock(&(index->writelock));
                                     index->lockIndex();
                                     index->checkAndReallocateAll(arg->probeMatrix, true, probeBucket.startPos, probeBucket.endPos, activeBlocks,
                                             arg->sums, arg->countsOfBlockValues, arg->sketches); // need for lock here
-                                    //                                    omp_unset_lock(&(index->writelock));
                                     index->unlockIndex();
                                 }
 
@@ -422,7 +421,6 @@ namespace ta {
 #endif 
 
                                 processIndexesTopk(query, user - queryBatch.startPos, index, queryIndex, activeBlocks, probeBucket, arg);
-
 
                             }
 
@@ -437,7 +435,7 @@ namespace ta {
             }
         }
 
-        inline virtual void run(ProbeBucket& probeBucket, RetrievalArguments* arg) const{
+        inline virtual void run(ProbeBucket& probeBucket, RetrievalArguments* arg) const {
 
             LshIndex* index = static_cast<LshIndex*> (probeBucket.getIndex(LSH));
 
@@ -501,10 +499,8 @@ namespace ta {
 #endif  
                                 if (activeBlocks > index->initializedSketchesForIndex) {
                                     index->lockIndex();
-                                    //                                    omp_set_lock(&(index->writelock));
                                     index->checkAndReallocateAll(arg->probeMatrix, true, probeBucket.startPos, probeBucket.endPos, activeBlocks,
                                             arg->sums, arg->countsOfBlockValues, arg->sketches); // need for lock here
-                                    //                                    omp_unset_lock(&(index->writelock));
                                     index->unlockIndex();
                                 }
 
@@ -522,6 +518,11 @@ namespace ta {
                 }
             }
 
+        }
+        
+               inline virtual void cleanupAfterTuning() {
+            std::cerr << "Error! You shouldn't have called that" << std::endl;
+            exit(1);
         }
 
 

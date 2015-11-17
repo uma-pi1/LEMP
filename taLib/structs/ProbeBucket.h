@@ -10,6 +10,8 @@
 
 
 #include <boost/unordered_set.hpp>
+#include <memory>
+
 using boost::unordered_set;
 
 namespace ta {
@@ -32,10 +34,6 @@ namespace ta {
         }
     };
 
-    class Retriever;
-
-
-    typedef boost::shared_ptr<Retriever> retriever_ptr;
     typedef std::vector< unordered_map< row_type, GlobalTopkTuneData > > Thread2Sample2Result;
 
     class ProbeBucket {
@@ -46,13 +44,12 @@ namespace ta {
 
         col_type colNum, numLists;
         row_type startPos, endPos, rowNum;
-        retriever_ptr ptrRetriever;
 
         row_type activeQueries; // active queries for this bucket. If multiple threads this will just be an estimation 
-        xValues_ptr xValues; // data: theta_b(q) id: sampleId
-        Thread2Sample2Result sampleThetas; // 1: thread 2: valid sample points for bucket -->result
+        std::vector<MatItem>* xValues; // data: theta_b(q) i: thread j: queryId
+        Thread2Sample2Result* sampleThetas; // 1: thread 2: valid sample points for bucket -->result
 
-        inline ProbeBucket() : numLists(1), t_b(1), runtime(0), activeQueries(0) {
+        inline ProbeBucket() : numLists(1), t_b(1), runtime(0), activeQueries(0), xValues(nullptr), sampleThetas(nullptr) {
             for (int i = 0; i < NUM_INDEXES; ++i) {
                 ptrIndexes[i] = nullptr;
             }
@@ -73,6 +70,16 @@ namespace ta {
             }
             if (ptrIndexes[LSH] != nullptr) {
                 delete static_cast<LshIndex*> (ptrIndexes[LSH]);
+            }
+
+            if (xValues != nullptr) {
+                delete xValues;
+                xValues = nullptr;
+            }
+
+            if (sampleThetas != nullptr) {
+                delete sampleThetas;
+                sampleThetas = nullptr;
             }
         }
 
@@ -106,8 +113,8 @@ namespace ta {
         }
 
         inline void sampling(std::vector<RetrievalArguments>& retrArg) {
-            xValues_ptr ptr(new std::vector<MatItem> ());
-            xValues = ptr;
+            xValues = new std::vector<MatItem> ();
+
             row_type sampleSize;
             // find the queries
 
@@ -159,20 +166,19 @@ namespace ta {
             }
         }
 
-        inline void setup_xValues_topk(const std::vector<RetrievalArguments>& retrArg, const Thread2Sample2Result& previousSampleThetas) {
+        inline void setup_xValues_topk(const std::vector<RetrievalArguments>& retrArg, const Thread2Sample2Result* previousSampleThetas) {
             // for the Row-Top-k we already have the sample of queries, 
             // but the order of sample queries on the x-axis (theta_b(q)) is changing from bucket to bucket
-
-            xValues_ptr ptr(new std::vector<MatItem>());
-            xValues = ptr;
+            xValues = new std::vector<MatItem> ();
+            
 
             for (int t = 0; t < retrArg.size(); ++t) {
 
-                row_type lastInd = sampleThetas[t].size();
-                auto it = sampleThetas[t].begin();
+                row_type lastInd = sampleThetas->at(t).size();
+                auto it = sampleThetas->at(t).begin();
 
                 while (lastInd > 0) {
-                    double localTheta = previousSampleThetas[t].at(it->first).results.front().data;
+                    double localTheta = previousSampleThetas->at(t).at(it->first).results.front().data;
                     localTheta *= (localTheta > 0 ? invNormL2.second : invNormL2.first);
                     xValues->emplace_back(localTheta, t, it->first);
                     lastInd--;
@@ -180,6 +186,20 @@ namespace ta {
                 }
             }
             std::sort(xValues->begin(), xValues->end(), std::less<MatItem>());
+        }
+
+        inline void cleanupAfterTuning() {
+            if (xValues != nullptr) {
+                delete xValues;
+                xValues = nullptr;
+            }
+
+            if (sampleThetas != nullptr) {
+                delete sampleThetas;
+                sampleThetas = nullptr;
+            }
+
+
         }
 
 

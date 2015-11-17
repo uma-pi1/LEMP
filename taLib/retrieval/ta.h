@@ -232,7 +232,7 @@ namespace ta {
                     int ind = probeBucket.xValues->at(i).j;
                     const double* query = retrArg[t].queryMatrix->getMatrixRowPtr(ind);
 
-                    const std::vector<QueueElement>& prevResults = prevBucket.sampleThetas[t].at(ind).results;
+                    const std::vector<QueueElement>& prevResults = prevBucket.sampleThetas->at(t).at(ind).results;
 
                     retrArg[0].heap.assign(prevResults.begin(), prevResults.end());
                     std::make_heap(retrArg[0].heap.begin(), retrArg[0].heap.end(), std::greater<QueueElement>());
@@ -325,6 +325,11 @@ namespace ta {
 
             }
 
+        }
+        
+               inline virtual void cleanupAfterTuning() {
+            std::cerr << "Error! You shouldn't have called that" << std::endl;
+            exit(1);
         }
 
     };
