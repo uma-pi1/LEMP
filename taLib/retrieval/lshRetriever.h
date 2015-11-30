@@ -165,7 +165,7 @@ namespace ta {
 
                         retrArg[0].tunerTimer.start();
                         queryIndex.checkAndReallocateSingle(retrArg[t].queryMatrix, ind, i, activeBlocks, retrArg[t].sums);
-                       
+
                         processIndexes(query, i, index, &queryIndex, activeBlocks, probeBucket, &retrArg[0]);
                         retrArg[0].tunerTimer.stop();
                         sampleTimes[i] = retrArg[0].tunerTimer.elapsedTime().nanos();
@@ -519,10 +519,9 @@ namespace ta {
             }
 
         }
-        
-               inline virtual void cleanupAfterTuning() {
-            std::cerr << "Error! You shouldn't have called that" << std::endl;
-            exit(1);
+
+        inline virtual void cleanupAfterTuning() {
+   
         }
 
 

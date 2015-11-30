@@ -27,7 +27,7 @@ namespace ta {
 
         void l2apProcessCandidates(const double* query, row_type nnzQuery, double maxQueryCoord,
                 row_type numCandidates, double localTheta, L2apIndex* index,
-                ProbeBucket& probeBucket, RetrievalArguments* arg) const{
+                ProbeBucket& probeBucket, RetrievalArguments* arg) const {
 
 
             double queryLength = query[-1];
@@ -144,7 +144,7 @@ check: // check similarity value
                     if (arg->k == 0) {
 
                         if (ip >= arg->theta) { //simT                              
-//                            arg->results.push_back(MatItem(ip, arg->queryId, arg->probeMatrix->getId(posInProbeMatrix)));
+                            //                            arg->results.push_back(MatItem(ip, arg->queryId, arg->probeMatrix->getId(posInProbeMatrix)));
                             arg->results.emplace_back(ip, arg->queryId, arg->probeMatrix->getId(posInProbeMatrix));
                         }
                     }
@@ -159,7 +159,7 @@ nexcid:
 
         void l2apProcessCandidatesTopk(const double* query, row_type nnzQuery, double maxQueryCoord,
                 row_type numCandidates, double localTheta, L2apIndex* index,
-                ProbeBucket& probeBucket, RetrievalArguments* arg) const{
+                ProbeBucket& probeBucket, RetrievalArguments* arg) const {
 
 
             double queryLength = query[-1];
@@ -279,7 +279,7 @@ check: // check similarity value
 
                         std::pop_heap(arg->heap.begin(), arg->heap.end(), std::greater<QueueElement>());
                         arg->heap.pop_back();
-//                        arg->heap.push_back(QueueElement(ip, arg->probeMatrix->getId(posInProbeMatrix)));
+                        //                        arg->heap.push_back(QueueElement(ip, arg->probeMatrix->getId(posInProbeMatrix)));
                         arg->heap.emplace_back(ip, arg->probeMatrix->getId(posInProbeMatrix));
                         std::push_heap(arg->heap.begin(), arg->heap.end(), std::greater<QueueElement>());
                         minScore = arg->heap.front().data;
@@ -303,7 +303,7 @@ nexcid:
         }
 
         void l2apFindMatches(const double * query, row_type nnzQuery, double maxQueryCoord,
-                L2apIndex* index, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
+                L2apIndex* index, ProbeBucket& probeBucket, RetrievalArguments* arg) const {
 
             double queryLength = query[-1];
 
@@ -449,7 +449,7 @@ nexcid:
         }
 
         void l2apFindMatchesTopk(const double * query, row_type nnzQuery, double maxQueryCoord,
-                L2apIndex* index, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
+                L2apIndex* index, ProbeBucket& probeBucket, RetrievalArguments* arg) const {
 
             double localTheta;
 
@@ -606,12 +606,12 @@ nexcid:
 
         ~apRetriever() = default;
 
-        inline virtual void run(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
+        inline virtual void run(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) const {
             std::cerr << "Error! You shouldn't have called that" << std::endl;
             exit(1);
         }
 
-        inline virtual void run(QueryBatch& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
+        inline virtual void run(QueryBatch& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) const {
             std::cerr << "Error! You shouldn't have called that" << std::endl;
             exit(1);
         }
@@ -621,7 +621,7 @@ nexcid:
             exit(1);
         }
 
-        inline virtual void runTopK(QueryBatch& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
+        inline virtual void runTopK(QueryBatch& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) const {
             std::cerr << "Error! You shouldn't have called that" << std::endl;
             exit(1);
         }
@@ -631,16 +631,16 @@ nexcid:
             exit(1);
         }
 
-        inline virtual void tuneTopk(ProbeBucket& probeBucket, const ProbeBucket& prevBucket,  std::vector<RetrievalArguments>& retrArg) {
+        inline virtual void tuneTopk(ProbeBucket& probeBucket, const ProbeBucket& prevBucket, std::vector<RetrievalArguments>& retrArg) {
             std::cerr << "Error! You shouldn't have called that" << std::endl;
             exit(1);
         }
 
-        inline virtual void runTopK(ProbeBucket& probeBucket, RetrievalArguments* arg) const{
+        inline virtual void runTopK(ProbeBucket& probeBucket, RetrievalArguments* arg) const {
             L2apIndex* index = static_cast<L2apIndex*> (probeBucket.getIndex(AP));
 
 
-            for(auto& queryBatch: arg->queryBatches){
+            for (auto& queryBatch : arg->queryBatches) {
 
                 if (queryBatch.isWorkDone())
                     continue;
@@ -676,7 +676,7 @@ nexcid:
                     double minScore = arg->topkResults[i].data;
 
                     if (probeBucket.normL2.second < minScore) {// skip this bucket and all other buckets
-                        queryBatch.inactivateQuery(user); 
+                        queryBatch.inactivateQuery(user);
                         user++;
                         continue;
                     }
@@ -702,11 +702,11 @@ nexcid:
 
         }
 
-        inline virtual void run(ProbeBucket& probeBucket, RetrievalArguments* arg) const{
+        inline virtual void run(ProbeBucket& probeBucket, RetrievalArguments* arg) const {
 
             L2apIndex* index = static_cast<L2apIndex*> (probeBucket.getIndex(AP));
 
-               for(auto& queryBatch: arg->queryBatches){
+            for (auto& queryBatch : arg->queryBatches) {
 
                 if (queryBatch.maxLength() < probeBucket.bucketScanThreshold) {
                     break;
@@ -725,6 +725,10 @@ nexcid:
 
                 }
             }
+
+        }
+
+        inline virtual void cleanupAfterTuning() {
 
         }
 

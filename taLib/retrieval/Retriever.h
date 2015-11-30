@@ -481,9 +481,8 @@ namespace ta {
         inline virtual void tuneTopk(ProbeBucket& probeBucket, const ProbeBucket& prevBucket, std::vector<RetrievalArguments>& retrArg) {
         }
 
-        inline virtual void cleanupAfterTuning() {
-            std::cerr << "Error! You shouldn't have called that LENGTH" << std::endl;
-            exit(1);
+         inline virtual void cleanupAfterTuning() {
+   
         }
     };
 
