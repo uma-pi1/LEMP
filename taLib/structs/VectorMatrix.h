@@ -95,7 +95,7 @@ namespace ta {
 
         inline void zeroOutLastPadding() {
             for (row_type i = 0; i < rowNum; ++i) {
-                data[(i + 1) * offset - 3] = 0; // zero-out the last padding
+                data[(i + 1) * offset -1] = 0; // zero-out the last padding 
             }
         }
 
@@ -233,6 +233,7 @@ namespace ta {
             extraMult = (sizeDiv2 < colNum);
             if (extraMult)
                 offset++;
+            
 
 
             rowNum = numOfRows;
