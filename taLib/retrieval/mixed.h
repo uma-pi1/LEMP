@@ -80,7 +80,7 @@ namespace ta {
         inline virtual void tuneTopk(ProbeBucket& probeBucket, const ProbeBucket& prevBucket, std::vector<RetrievalArguments>& retrArg) {
             row_type sampleSize = (probeBucket.xValues != nullptr ? probeBucket.xValues->size() : 0);
 
-            if (sampleSize > 0) {
+            
                 plainRetriever.sampleTimes.reserve(sampleSize);
 
                 for (row_type i = 0; i < sampleSize; ++i) {
@@ -101,9 +101,7 @@ namespace ta {
                     probeBucket.setAfterTuning(otherRetriever.dataForTuning->bestPhi + 1, value);
                 }
 
-            } else {
-                probeBucket.setAfterTuning(prevBucket.numLists, prevBucket.t_b);
-            }
+            
 
         }
 

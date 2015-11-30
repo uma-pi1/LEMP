@@ -56,23 +56,23 @@ namespace ta {
 
         // arg should point to the correct tree
 
-        inline virtual void run(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
+        inline virtual void run(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) const {
 
             fastmks->SearchForTheta(arg->theta, arg->tree->tree, arg->probeMatrix, arg->queryMatrix, arg->results, arg->queryPos, arg->comparisons, arg->threads);
         }
 
-        inline virtual void run(QueryBatch& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
+        inline virtual void run(QueryBatch& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) const {
             std::cerr << "Error! You shouldn't have called that" << std::endl;
             exit(1);
         }
 
-        inline virtual void runTopK(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
+        inline virtual void runTopK(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) const {
             fastmks->Search(arg->k, arg->tree->tree, arg->probeMatrix, arg->queryMatrix, arg->heap, arg->queryPos, arg->comparisons, arg->threads);
         }
 
         // this is to be used only by the 1st bucket in Row-Top-k. It just QueryBatchializes the top-k elements
 
-        inline virtual void runTopK(QueryBatch& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
+        inline virtual void runTopK(QueryBatch& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) const {
             std::cerr << "Error! You shouldn't have called that" << std::endl;
             exit(1);
         }
@@ -101,34 +101,28 @@ namespace ta {
         }
 
         inline virtual void tuneTopk(ProbeBucket& probeBucket, const ProbeBucket& prevBucket, std::vector<RetrievalArguments>& retrArg) {
+            row_type sampleSize = (probeBucket.xValues != nullptr ? probeBucket.xValues->size() : 0);
+            sampleTimes.resize(sampleSize);
+            TreeIndex * index = static_cast<TreeIndex*> (probeBucket.ptrIndexes[TREE]);
 
-            row_type sampleSize = (probeBucket.xValues!=nullptr ? probeBucket.xValues->size() : 0);
-            
+            for (row_type i = 0; i < sampleSize; ++i) {
+                int t = probeBucket.xValues->at(i).i;
+                int ind = probeBucket.xValues->at(i).j;
 
-            if (sampleSize > 0) {
-                sampleTimes.resize(sampleSize);
-                TreeIndex * index = static_cast<TreeIndex*> (probeBucket.ptrIndexes[TREE]);
+                const std::vector<QueueElement>& prevResults = prevBucket.sampleThetas->at(t).at(ind).results;
 
-                for (row_type i = 0; i < sampleSize; ++i) {
-                    int t = probeBucket.xValues->at(i).i;
-                    int ind = probeBucket.xValues->at(i).j;
+                retrArg[0].heap.assign(prevResults.begin(), prevResults.end());
+                std::make_heap(retrArg[0].heap.begin(), retrArg[0].heap.end(), std::greater<QueueElement>());
 
-                    const std::vector<QueueElement>& prevResults = prevBucket.sampleThetas->at(t).at(ind).results;
-
-                    retrArg[0].heap.assign(prevResults.begin(), prevResults.end());
-                    std::make_heap(retrArg[0].heap.begin(), retrArg[0].heap.end(), std::greater<QueueElement>());
-
-                    retrArg[0].tunerTimer.start();
-                    fastmks->Search(retrArg[0].k, index->tree, retrArg[0].probeMatrix, retrArg[t].queryMatrix, retrArg[0].heap, ind, retrArg[0].comparisons, 1);
-                    retrArg[0].tunerTimer.stop();
-                    sampleTimes[i] = retrArg[0].tunerTimer.elapsedTime().nanos();
-                }
-            }else {
-                probeBucket.setAfterTuning(prevBucket.numLists, prevBucket.t_b);
+                retrArg[0].tunerTimer.start();
+                fastmks->Search(retrArg[0].k, index->tree, retrArg[0].probeMatrix, retrArg[t].queryMatrix, retrArg[0].heap, ind, retrArg[0].comparisons, 1);
+                retrArg[0].tunerTimer.stop();
+                sampleTimes[i] = retrArg[0].tunerTimer.elapsedTime().nanos();
             }
+
         }
 
-        inline virtual void runTopK(ProbeBucket& probeBucket, RetrievalArguments* arg) const{
+        inline virtual void runTopK(ProbeBucket& probeBucket, RetrievalArguments* arg) const {
 
             TreeIndex * index = static_cast<TreeIndex*> (probeBucket.ptrIndexes[TREE]);
 
@@ -171,7 +165,7 @@ namespace ta {
 
         }
 
-        inline virtual void run(ProbeBucket& probeBucket, RetrievalArguments* arg) const{
+        inline virtual void run(ProbeBucket& probeBucket, RetrievalArguments* arg) const {
 
             TreeIndex * index = static_cast<TreeIndex*> (probeBucket.ptrIndexes[TREE]);
 
@@ -191,9 +185,9 @@ namespace ta {
                 }
             }
         }
-        
+
         inline virtual void cleanupAfterTuning() {
-   
+
         }
 
 

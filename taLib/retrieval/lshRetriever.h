@@ -202,7 +202,7 @@ namespace ta {
 
             row_type sampleSize = (probeBucket.xValues != nullptr ? probeBucket.xValues->size() : 0);
 
-            if (sampleSize > 0) {
+          
                 plain.sampleTimes.reserve(sampleSize);
 
                 for (row_type i = 0; i < sampleSize; ++i) {
@@ -307,9 +307,7 @@ namespace ta {
                         probeBucket.setAfterTuning(1, min_t_b);
                     }
                 }
-            } else {
-                probeBucket.setAfterTuning(prevBucket.numLists, prevBucket.t_b);
-            }
+           
 
 
         }

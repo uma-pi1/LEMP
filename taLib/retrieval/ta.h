@@ -31,7 +31,7 @@ namespace ta {
         taRetriever() = default;
         ~taRetriever() = default;
 
-        inline virtual void run(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
+        inline virtual void run(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) const {
 
             QueueElementLists* invLists = static_cast<QueueElementLists*> (probeBucket.getIndex(SL));
 
@@ -64,7 +64,7 @@ namespace ta {
                 //choose next step
                 stepOnCol = arg->state->chooseStep();
                 //pick up the item
-                
+
                 oldValue = invLists->getElement(arg->state->getDepthInFringeInCol(stepOnCol))->data;
                 posMatrix = invLists->getElement(arg->state->getDepthInFringeInCol(stepOnCol))->id;
 #ifdef TIME_IT
@@ -105,12 +105,12 @@ namespace ta {
 
         }
 
-        inline virtual void run(QueryBatch& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
+        inline virtual void run(QueryBatch& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) const {
             std::cerr << "Error! You shouldn't have called that" << std::endl;
             exit(1);
         }
 
-        inline void runTopK(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
+        inline void runTopK(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) const {
 
             col_type stepOnCol = 0;
             row_type posMatrix;
@@ -180,7 +180,7 @@ namespace ta {
             }
         }
 
-        inline virtual void runTopK(QueryBatch& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
+        inline virtual void runTopK(QueryBatch& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) const {
             std::cerr << "Error! You shouldn't have called that" << std::endl;
             exit(1);
         }
@@ -188,7 +188,7 @@ namespace ta {
         inline virtual void tune(ProbeBucket& probeBucket, const ProbeBucket& prevBucket, std::vector<RetrievalArguments>& retrArg) {
 
             row_type sampleSize = probeBucket.xValues->size();
-            
+
             if (sampleSize > 0) {
                 sampleTimes.resize(sampleSize);
                 QueueElementLists* invLists = static_cast<QueueElementLists*> (probeBucket.getIndex(SL));
@@ -215,40 +215,35 @@ namespace ta {
         }
 
         inline virtual void tuneTopk(ProbeBucket& probeBucket, const ProbeBucket& prevBucket, std::vector<RetrievalArguments>& retrArg) {
+            row_type sampleSize = (probeBucket.xValues != nullptr ? probeBucket.xValues->size() : 0);
+            sampleTimes.resize(sampleSize);
+            QueueElementLists* invLists = static_cast<QueueElementLists*> (probeBucket.getIndex(SL));
 
-            row_type sampleSize = (probeBucket.xValues!=nullptr ? probeBucket.xValues->size() : 0);
+            // todo shouldn't I initialize the lists? no! already initialized from Incremental
 
-            if (sampleSize > 0) {
-                sampleTimes.resize(sampleSize);
-                QueueElementLists* invLists = static_cast<QueueElementLists*> (probeBucket.getIndex(SL));
+            retrArg[0].state->initializeForNewBucket(invLists);
 
-                // todo shouldn't I initialize the lists? no! already initialized from Incremental
+            for (row_type i = 0; i < sampleSize; ++i) {
 
-                retrArg[0].state->initializeForNewBucket(invLists);
+                int t = probeBucket.xValues->at(i).i;
+                int ind = probeBucket.xValues->at(i).j;
+                const double* query = retrArg[t].queryMatrix->getMatrixRowPtr(ind);
 
-                for (row_type i = 0; i < sampleSize; ++i) {
+                const std::vector<QueueElement>& prevResults = prevBucket.sampleThetas->at(t).at(ind).results;
 
-                    int t = probeBucket.xValues->at(i).i;
-                    int ind = probeBucket.xValues->at(i).j;
-                    const double* query = retrArg[t].queryMatrix->getMatrixRowPtr(ind);
+                retrArg[0].heap.assign(prevResults.begin(), prevResults.end());
+                std::make_heap(retrArg[0].heap.begin(), retrArg[0].heap.end(), std::greater<QueueElement>());
 
-                    const std::vector<QueueElement>& prevResults = prevBucket.sampleThetas->at(t).at(ind).results;
-
-                    retrArg[0].heap.assign(prevResults.begin(), prevResults.end());
-                    std::make_heap(retrArg[0].heap.begin(), retrArg[0].heap.end(), std::greater<QueueElement>());
-
-                    retrArg[0].tunerTimer.start();
-                    runTopK(query, probeBucket, &retrArg[0]);
-                    retrArg[0].tunerTimer.stop();
-                    sampleTimes[i] = retrArg[0].tunerTimer.elapsedTime().nanos();
-                }
-            }else {
-                probeBucket.setAfterTuning(prevBucket.numLists, prevBucket.t_b);
+                retrArg[0].tunerTimer.start();
+                runTopK(query, probeBucket, &retrArg[0]);
+                retrArg[0].tunerTimer.stop();
+                sampleTimes[i] = retrArg[0].tunerTimer.elapsedTime().nanos();
             }
+
 
         }
 
-        inline virtual void runTopK(ProbeBucket& probeBucket, RetrievalArguments* arg) const{
+        inline virtual void runTopK(ProbeBucket& probeBucket, RetrievalArguments* arg) const {
             QueueElementLists* invLists = static_cast<QueueElementLists*> (probeBucket.getIndex(SL));
 
             for (auto& queryBatch : arg->queryBatches) {
@@ -302,7 +297,7 @@ namespace ta {
 
         }
 
-        inline virtual void run(ProbeBucket& probeBucket, RetrievalArguments* arg) const{
+        inline virtual void run(ProbeBucket& probeBucket, RetrievalArguments* arg) const {
             QueueElementLists* invLists = static_cast<QueueElementLists*> (probeBucket.getIndex(SL));
 
             arg->state->initializeForNewBucket(invLists);
@@ -326,9 +321,9 @@ namespace ta {
             }
 
         }
-        
+
         inline virtual void cleanupAfterTuning() {
-   
+
         }
 
     };

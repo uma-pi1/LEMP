@@ -426,15 +426,9 @@ namespace ta {
             }
         }
 
-        inline virtual void tuneTopk(ProbeBucket& probeBucket, const ProbeBucket& prevBucket, std::vector<RetrievalArguments>& retrArg) {
-            row_type sampleSize = (probeBucket.xValues!=nullptr ? probeBucket.xValues->size() : 0);
-            if (sampleSize > 0) {
+        inline virtual void tuneTopk(ProbeBucket& probeBucket, const ProbeBucket& prevBucket, std::vector<RetrievalArguments>& retrArg) {           
                 dataForTuning = std::unique_ptr<ListTuneData>(new ListTuneData());
-                dataForTuning->tuneTopk(probeBucket, prevBucket, retrArg, this);
-            }else {
-                probeBucket.setAfterTuning(prevBucket.numLists, prevBucket.t_b);
-            }
-
+                dataForTuning->tuneTopk(probeBucket, prevBucket, retrArg, this);         
         }
 
         inline virtual void runTopK(ProbeBucket& probeBucket, RetrievalArguments* arg) const{

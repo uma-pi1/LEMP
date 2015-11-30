@@ -665,10 +665,16 @@ namespace ta {
                         t.start();
 
                         for (row_type b = 1; b < probeBuckets.size(); ++b) {
-                            retrievers[b]->tuneTopk(probeBuckets[b], probeBuckets[b - 1], retrArg);
+
+                            if (b < numBucketsToTune) {
+                                retrievers[b]->tuneTopk(probeBuckets[b], probeBuckets[b - 1], retrArg);
+                            } else {
+                                probeBuckets[b].setAfterTuning(probeBuckets[b - 1].numLists, probeBuckets[b - 1].t_b);
+                            }
+
                         }
 
-                        
+
                         // then release memory not needed any more
                         for (row_type b = 1; b < numBucketsToTune; ++b) {
                             retrievers[b]->cleanupAfterTuning();
