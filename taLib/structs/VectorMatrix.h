@@ -233,8 +233,6 @@ namespace ta {
             extraMult = (sizeDiv2 < colNum);
             if (extraMult)
                 offset++;
-            
-
 
             rowNum = numOfRows;
 
