@@ -66,11 +66,11 @@ namespace ta {
                 retrArg[0].competitorMethod = &plainRetriever.sampleTimes;
                 otherRetriever.tune(probeBucket, prevBucket, retrArg);
 
-                if (plainRetriever.sampleTotalTime < otherRetriever.dataForTuning->bestTime) {
+                if (plainRetriever.sampleTotalTime < otherRetriever.dataForTuning.bestTime) {
                     probeBucket.setAfterTuning(1, 1);
                 } else {
-                    double value = (otherRetriever.dataForTuning->t_b_indx == 0 ? -1 : probeBucket.xValues->at(otherRetriever.dataForTuning->t_b_indx).result);
-                    probeBucket.setAfterTuning(otherRetriever.dataForTuning->bestPhi + 1, value);
+                    double value = (otherRetriever.dataForTuning.t_b_indx == 0 ? -1 : probeBucket.xValues->at(otherRetriever.dataForTuning.t_b_indx).result);
+                    probeBucket.setAfterTuning(otherRetriever.dataForTuning.bestPhi + 1, value);
                 }
             } else {
                 probeBucket.setAfterTuning(prevBucket.numLists, prevBucket.t_b);
@@ -78,34 +78,39 @@ namespace ta {
         }
 
         inline virtual void tuneTopk(ProbeBucket& probeBucket, const ProbeBucket& prevBucket, std::vector<RetrievalArguments>& retrArg) {
-            row_type sampleSize = (probeBucket.xValues != nullptr ? probeBucket.xValues->size() : 0);
-
+            row_type sampleSize = (probeBucket.xValues!=nullptr ? probeBucket.xValues->size() : 0);
             
+            
+            
+
+            if (sampleSize > 0) {
                 plainRetriever.sampleTimes.reserve(sampleSize);
 
                 for (row_type i = 0; i < sampleSize; ++i) {
                     int t = probeBucket.xValues->at(i).i;
                     int ind = probeBucket.xValues->at(i).j;
 
-                    plainRetriever.sampleTimes.push_back(probeBucket.sampleThetas->at(t)[ind].lengthTime);
-                    plainRetriever.sampleTotalTime += probeBucket.sampleThetas->at(t)[ind].lengthTime;
+                    plainRetriever.sampleTimes.push_back(probeBucket.sampleThetas[t][ind].lengthTime);
+                    plainRetriever.sampleTotalTime += probeBucket.sampleThetas[t][ind].lengthTime;
                 }
                 retrArg[0].competitorMethod = &plainRetriever.sampleTimes;
 
                 otherRetriever.tuneTopk(probeBucket, prevBucket, retrArg);
 
-                if (plainRetriever.sampleTotalTime < otherRetriever.dataForTuning->bestTime) {
+                if (plainRetriever.sampleTotalTime < otherRetriever.dataForTuning.bestTime) {
                     probeBucket.setAfterTuning(1, 1);
                 } else {
-                    double value = (otherRetriever.dataForTuning->t_b_indx == 0 ? -1 : probeBucket.xValues->at(otherRetriever.dataForTuning->t_b_indx).result);
-                    probeBucket.setAfterTuning(otherRetriever.dataForTuning->bestPhi + 1, value);
+                    double value = (otherRetriever.dataForTuning.t_b_indx == 0 ? -1 : probeBucket.xValues->at(otherRetriever.dataForTuning.t_b_indx).result);
+                    probeBucket.setAfterTuning(otherRetriever.dataForTuning.bestPhi + 1, value);
                 }
 
-            
+            } else {
+                probeBucket.setAfterTuning(prevBucket.numLists, prevBucket.t_b);
+            }
 
         }
 
-        inline virtual void runTopK(ProbeBucket& probeBucket, RetrievalArguments* arg) const {
+        inline virtual void runTopK(ProbeBucket& probeBucket, RetrievalArguments* arg) const{
 
 
             if (probeBucket.t_b == 1) {
@@ -191,7 +196,7 @@ namespace ta {
             }
         }
 
-        inline virtual void run(ProbeBucket& probeBucket, RetrievalArguments* arg) const {
+        inline virtual void run(ProbeBucket& probeBucket, RetrievalArguments* arg) const{
             arg->numLists = probeBucket.numLists;
 
             for (auto& queryBatch : arg->queryBatches) {
@@ -240,10 +245,6 @@ namespace ta {
                 }
             }
 
-        }
-
-        inline virtual void cleanupAfterTuning() {
-            otherRetriever.cleanupAfterTuning();
         }
 
     };

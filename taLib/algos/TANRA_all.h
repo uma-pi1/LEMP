@@ -30,7 +30,6 @@ namespace ta {
         rg::Timer t;
         VectorMatrix queryMatrix, probeMatrix;
         ProbeBucket probeBucket, probeBucketK;
-        std::unique_ptr<Retriever>  ptrMain;
 
         std::vector< MatItem >* thetaResults; // for a specific query holds the itemIDs + the score
         std::vector<QueueElement> * topkResults;
@@ -42,7 +41,7 @@ namespace ta {
 
         double dataManipulationTime;
 
-        inline TANRA_all(LEMPArg& args) : args(args), dataManipulationTime(0),  ptrMain(new tanraRetriever()) {
+        inline TANRA_all(LEMPArg& args) : args(args), dataManipulationTime(0) {
 
              if (args.querySideLeft) {
                 queryMatrix.readFromFile(args.usersFile, args.r, args.m, true);
@@ -83,8 +82,8 @@ namespace ta {
             probeBucket.init(probeMatrix, 0, probeMatrix.rowNum, args); // initialize
             probeBucket.bucketScanThreshold = args.theta / probeBucket.normL2.second;
 
-           
-            
+            retriever_ptr rPtr(new tanraRetriever());
+            probeBucket.ptrRetriever = rPtr;
             if (probeBucket.ptrIndexes[SL] == 0)
                 probeBucket.ptrIndexes[SL] = new QueueElementLists();
 
@@ -121,7 +120,7 @@ namespace ta {
             for (row_type i = 0; i < queryMatrix.rowNum; i++) {
                 const double* query = queryMatrix.getMatrixRowPtr(i);
                 retrArg->queryId = i;
-                ptrMain->run(query, probeBucket, retrArg); 
+                probeBucket.ptrRetriever->run(query, probeBucket, retrArg); 
             }
 
 

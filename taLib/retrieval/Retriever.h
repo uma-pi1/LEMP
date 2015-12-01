@@ -55,7 +55,7 @@ namespace ta {
             exit(1);
         }
 
-        inline virtual void runTopK(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) const {
+        inline virtual void runTopK(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
             std::cerr << "Error! You shouldn't have called that" << std::endl;
             exit(1);
         }
@@ -114,11 +114,6 @@ namespace ta {
             exit(1);
         }
 
-        inline virtual void cleanupAfterTuning() {
-            std::cerr << "Error! You shouldn't have called that RETRIEVER" << std::endl;
-            exit(1);
-        }
-
 
     };
 
@@ -127,7 +122,7 @@ namespace ta {
         /*
          * scans itemMatrix from position start to position end for inner products above args.theta. Method length
          */
-        inline void length(const double *query, row_type start, row_type end, RetrievalArguments* arg) const {
+        inline void length(const double *query, row_type start, row_type end, RetrievalArguments* arg) const{
 
             for (row_type j = start; j < end; ++j) {
 
@@ -160,7 +155,7 @@ namespace ta {
         /*
          * scans itemMatrix from position start to position end for inner products above args.theta. Method: Naive
          */
-        inline void naive(const double *query, row_type start, row_type end, RetrievalArguments* arg) const {
+        inline void naive(const double *query, row_type start, row_type end, RetrievalArguments* arg) const{
 
             for (row_type j = start; j < end; ++j) {
                 arg->comparisons++;
@@ -172,7 +167,7 @@ namespace ta {
             }
         }
 
-        inline void naiveTopk(const double *query, row_type start, row_type end, RetrievalArguments* arg) const {
+        inline void naiveTopk(const double *query, row_type start, row_type end, RetrievalArguments* arg) const{
             double minScore = arg->heap.front().data;
 
             for (row_type j = start; j < end; ++j) {
@@ -193,7 +188,7 @@ namespace ta {
          * scans itemMatrix from position start to position end for inner products above current minScore. Method length
          * assumes that  results already contains args.k elements
          */
-        inline void lengthTopk(const double *query, row_type start, row_type end, RetrievalArguments* arg) const {
+        inline void lengthTopk(const double *query, row_type start, row_type end, RetrievalArguments* arg) const{
 
             double minScore = arg->heap.front().data;
 
@@ -241,7 +236,7 @@ namespace ta {
 
         }
 
-        inline virtual void run(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) const {
+        inline virtual void run(const double* query, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
 #ifdef TIME_IT
             //std::cout<<" LENGTH-based retrieval running "<<std::endl;
             arg->t.start();
@@ -257,7 +252,7 @@ namespace ta {
 #endif
         }
 
-        inline virtual void run(QueryBatch& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) const {
+        inline virtual void run(QueryBatch& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
 #ifdef TIME_IT
             arg->t.start();
 #endif
@@ -288,7 +283,7 @@ namespace ta {
 #endif
         }
 
-        inline virtual void runTopK(QueryBatch& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) const {
+        inline virtual void runTopK(QueryBatch& queryBatch, ProbeBucket& probeBucket, RetrievalArguments* arg) const{
 
 
 #ifdef TIME_IT
@@ -328,7 +323,7 @@ namespace ta {
 
 
                 if (probeBucket.normL2.second < minScoreAppr) {// skip this bucket and all other buckets
-                    queryBatch.inactivateQuery(user);
+                    queryBatch.inactivateQuery(user); 
                     user++;
                     continue;
                 }
@@ -396,7 +391,7 @@ namespace ta {
 
 
                     if (probeBucket.normL2.second < minScoreAppr) {// skip this bucket and all other buckets
-                        queryBatch.inactivateQuery(user);
+                        queryBatch.inactivateQuery(user); 
                         user++;
                         continue;
                     }
@@ -420,7 +415,7 @@ namespace ta {
 
         }
 
-        inline virtual void run(ProbeBucket& probeBucket, RetrievalArguments* arg) const {
+        inline virtual void run(ProbeBucket& probeBucket, RetrievalArguments* arg) const{
 
             for (auto& queryBatch : arg->queryBatches) {
 
@@ -479,10 +474,6 @@ namespace ta {
         }
 
         inline virtual void tuneTopk(ProbeBucket& probeBucket, const ProbeBucket& prevBucket, std::vector<RetrievalArguments>& retrArg) {
-        }
-
-         inline virtual void cleanupAfterTuning() {
-   
         }
     };
 

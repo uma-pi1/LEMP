@@ -15,23 +15,6 @@
 
 namespace ta {
 
-    struct CoreLshInfo {
-        row_type sketchSize;
-        long long userOffset;
-        row_type bytesPerCode;
-        row_type numHashTables;
-        row_type hashCodeLength; // must be a multiple of 8.
-
-        inline void  init(row_type codeLength, row_type signatures) {
-            hashCodeLength = codeLength;
-            numHashTables = signatures;
-            sketchSize = numHashTables*hashCodeLength;
-            bytesPerCode = hashCodeLength / 8;
-            userOffset = bytesPerCode * ((long) numHashTables);
-        }
-    };
-    
-    CoreLshInfo coreLshInfo;
 
     // This is a singleton class
 
@@ -44,16 +27,18 @@ namespace ta {
 
         int range; // if we only want gaussian samples between -8 and  +8, set range to 16.
         int nDimensions;
+        int nHashes;
 
-        inline RandomIntGaussians(int dimensions) : nDimensions(dimensions),  range(16), //[-8,8]
+        inline RandomIntGaussians(int dimensions, int numHashes) : nDimensions(dimensions), nHashes(numHashes), range(16), //[-8,8]
         intGaussians(nullptr), intToFloatCache(nullptr) {
+            assert(numHashes % 8 == 0);
 
             leftLimit = (0 - range) / 2.0;
             rightLimit = leftLimit + range;
             floatToIntFactor = (65535) * 1.0 / range;
             intToFloatFactor = range * 1.0 / (65535); // 65535 largest int in 16 bits
 
-            long s = coreLshInfo.sketchSize * nDimensions; //maxHashes            
+            long s = nHashes * nDimensions; //maxHashes            
             intGaussians = new uint16_t[s];
             rng.seed(123); // not that random
             int cacheSize = 65536;
@@ -73,10 +58,10 @@ namespace ta {
             boost::normal_distribution<> nd(0.0, 1.0);
             boost::variate_generator<boost::mt19937&, boost::normal_distribution<> > var_normal(rng, nd);
 
-            for (int b = 0; b < coreLshInfo.sketchSize; ++b) {
+            for (int b = 0; b < nHashes; ++b) {
 
                 for (int d = 0; d < nDimensions; ++d) {
-                    long long k = d * coreLshInfo.sketchSize + b;
+                    long long k = d * nHashes + b;
                     rf = (float) var_normal();
                     if (rf < leftLimit) {
                         intGaussians[k] = (uint16_t) 0;
@@ -109,8 +94,8 @@ namespace ta {
         float *intToFloatCache;
         uint16_t* intGaussians; // dimensions x nHashes
 
-        static RandomIntGaussians& getInstance(int dimensions) {// call as RandomIntGaussians::getInstance() gives you functionality similar to a global variable
-            static RandomIntGaussians rig(dimensions); // static: protection from data races
+        static RandomIntGaussians& getInstance(int dimensions, int numHashes) {// call as RandomIntGaussians::getInstance() gives you functionality similar to a global variable
+            static RandomIntGaussians rig(dimensions, numHashes); // static: protection from data races
             return rig;
         }
 

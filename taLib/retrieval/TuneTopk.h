@@ -50,11 +50,8 @@ namespace ta {
         rg::Random32& random = retrArg[0].random;
 
 
-        for (auto& b : probeBuckets) {
-            b.sampleThetas = new Thread2Sample2Result();
-            b.sampleThetas->resize(retrArg.size());
-        }
-
+        for (auto& b : probeBuckets)
+            b.sampleThetas.resize(retrArg.size());
 
         retrArg[0].heap.resize(retrArg[0].k);
 
@@ -73,21 +70,21 @@ namespace ta {
                 // I will need to keep track of the topk results of each query for each bucket. The kth value in the topk list will give me the theta_b(q))
                 // that corresponds to this query
                 // I keep this info in the retrArg because it will be needed later in the ListsTuneData.h                
-                probeBuckets[0].sampleThetas->at(t)[id] = GlobalTopkTuneData();
+                probeBuckets[0].sampleThetas[t][id] = GlobalTopkTuneData();
 
 
                 for (row_type j = probeBuckets[0].startPos; j < probeBuckets[0].endPos; ++j) {
                     double ip = retrArg[0].probeMatrix->innerProduct(j, query);
-                    probeBuckets[0].sampleThetas->at(t)[id].results.emplace_back(ip, retrArg[0].probeMatrix->getId(j));
+                    probeBuckets[0].sampleThetas[t][id].results.emplace_back(ip, retrArg[0].probeMatrix->getId(j));
                 }
 
                 // and now make the heap
-                std::make_heap(probeBuckets[0].sampleThetas->at(t)[id].results.begin(), probeBuckets[0].sampleThetas->at(t)[id].results.end(), std::greater<QueueElement>()); // non thread safe
+                std::make_heap(probeBuckets[0].sampleThetas[t][id].results.begin(), probeBuckets[0].sampleThetas[t][id].results.end(), std::greater<QueueElement>()); // non thread safe
 
                 for (row_type b = 1; b < probeBuckets.size(); ++b) {
 
 
-                    std::vector<QueueElement>& prevResults = probeBuckets[b - 1].sampleThetas->at(t)[id].results;
+                    std::vector<QueueElement>& prevResults = probeBuckets[b - 1].sampleThetas[t][id].results;
 
 
                     if (prevResults.front().data >= probeBuckets[b].normL2.second) { // bucket check
@@ -95,11 +92,11 @@ namespace ta {
 
                     } else {// run LENGTH and measure the time
 
-                        if (probeBuckets[b].sampleThetas->size() == 0) {
-                            probeBuckets[b].sampleThetas->resize(retrArg.size());
+                        if (probeBuckets[b].sampleThetas.size() == 0) {
+                            probeBuckets[b].sampleThetas.resize(retrArg.size());
                         }
 
-                        probeBuckets[b].sampleThetas->at(t)[id] = GlobalTopkTuneData();
+                        probeBuckets[b].sampleThetas[t][id] = GlobalTopkTuneData();
 
                         std::copy(prevResults.begin(), prevResults.end(), retrArg[0].heap.begin());
                         std::make_heap(retrArg[0].heap.begin(), retrArg[0].heap.end(), std::greater<QueueElement>());
@@ -107,10 +104,10 @@ namespace ta {
                         retrArg[0].tunerTimer.start();
                         plainRetriever.runTopK(query, probeBuckets[b], &retrArg[0]);
                         retrArg[0].tunerTimer.stop();
-                        probeBuckets[b].sampleThetas->at(t)[id].lengthTime = retrArg[0].tunerTimer.elapsedTime().nanos();
+                        probeBuckets[b].sampleThetas[t][id].lengthTime = retrArg[0].tunerTimer.elapsedTime().nanos();
 
-                        probeBuckets[b].sampleThetas->at(t)[id].results.reserve(retrArg[0].k);
-                        std::copy_n(retrArg[0].heap.begin(), retrArg[0].k, std::back_inserter(probeBuckets[b].sampleThetas->at(t)[id].results));
+                        probeBuckets[b].sampleThetas[t][id].results.reserve(retrArg[0].k);
+                        std::copy_n(retrArg[0].heap.begin(), retrArg[0].k, std::back_inserter(probeBuckets[b].sampleThetas[t][id].results));
 
                         if (b > bucketsForInit)
                             bucketsForInit = b;
@@ -125,7 +122,7 @@ namespace ta {
             row_type counter = 0;
 
             for (int t = 0; t < retrArg.size(); ++t) {
-                counter += probeBuckets[b].sampleThetas->at(t).size();
+                counter += probeBuckets[b].sampleThetas[t].size();
             }
 
             if (counter >= LOWER_LIMIT_PER_BUCKET) {
@@ -135,11 +132,17 @@ namespace ta {
             }
 
         }
-        activeBuckets++;
+        activeBuckets++;        
         bucketsForInit++;
+        
+        
+        for (row_type b = activeBuckets; b < probeBuckets.size(); ++b) {
+            if (probeBuckets[b].xValues != nullptr)
+                probeBuckets[b].xValues->clear();
+            probeBuckets[b].sampleThetas.clear();
+        }
 
 
-  
         p.first = activeBuckets; // I will try to tune t_b, phi for all these buckets
         p.second = bucketsForInit; // I will create indexes for all these buckets (in multi-threaded it is better to create indexes before you enter the retrieval phase)
 

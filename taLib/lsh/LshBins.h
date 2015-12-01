@@ -13,7 +13,9 @@ namespace ta {
 
     class LshBins {
     protected:
-
+        long long userOffset;
+        row_type bytesPerCode;
+        row_type numHashTables;
         row_type nVectors;
         long long numBinsPerHashTable;
 
@@ -21,13 +23,13 @@ namespace ta {
 
 
         inline LshBins() = default;
-        
-        virtual ~LshBins() = default;
 
-        inline void init(row_type nVectors_) {
-
+        inline void init(int bytesPerCode_, int numHashTables_, row_type nVectors_) {
+            bytesPerCode = bytesPerCode_;
+            numHashTables = numHashTables_;
             nVectors = nVectors_;
-            numBinsPerHashTable = pow(2, coreLshInfo.bytesPerCode * 8);
+            userOffset = bytesPerCode * numHashTables;
+            numBinsPerHashTable = pow(2, bytesPerCode * 8);
         }
 
         inline virtual void printBins() {
@@ -69,11 +71,11 @@ namespace ta {
 
             // update hashBuckets
             for (int block = startBlock; block < endBlock; ++block) {
-                row_type startOffset = coreLshInfo.bytesPerCode * block;
+                row_type startOffset = bytesPerCode * block;
                 int blockOffsetOnData = block * nVectors;
 
                 for (row_type i = 0; i < nVectors; ++i) {
-                    long long t = i * coreLshInfo.userOffset + startOffset;
+                    long long t = i * userOffset + startOffset;
                     uint8_t key = sketch[t];
                     countsOfBlockValues[key]++;
                 }
@@ -85,7 +87,7 @@ namespace ta {
                 }
 
                 for (row_type i = 0; i < nVectors; ++i) {
-                    long long t = i * coreLshInfo.userOffset + startOffset;
+                    long long t = i * userOffset + startOffset;
                     uint8_t key = sketch[t];
                     sketch[t] = 0;
                     int j = binsOffsets[startOffset2 + key + 1] - countsOfBlockValues[key];
@@ -100,7 +102,7 @@ namespace ta {
                 boost::dynamic_bitset<>& done, row_type activeBlocks, row_type probeBucketStartPos) {
 
             done.reset();
-            long long t = queryPos * coreLshInfo.userOffset;
+            long long t = queryPos * userOffset;
             row_type offset2 = 256 + 1;
             row_type offset = 0;
 
@@ -140,18 +142,18 @@ namespace ta {
 
         inline void populateBins(uint8_t* sketch, row_type startBlock, row_type endBlock, std::vector<row_type>& countsOfBlockValues) {
             bins.resize(endBlock);
-            row_type startOffset = coreLshInfo.bytesPerCode * startBlock;
+            row_type startOffset = bytesPerCode * startBlock;
 
 
             for (row_type i = 0; i < nVectors; ++i) {
-                long long t = i * coreLshInfo.userOffset + startOffset;
+                long long t = i * userOffset + startOffset;
 
                 for (int block = startBlock; block < endBlock; ++block) {
                     T key = 0;
-                    memcpy(&key, sketch + t, coreLshInfo.bytesPerCode);
-                    memset(sketch + t, 0, coreLshInfo.bytesPerCode);
+                    memcpy(&key, sketch + t, bytesPerCode);
+                    memset(sketch + t, 0, bytesPerCode);
 
-                    t += coreLshInfo.bytesPerCode;
+                    t += bytesPerCode;
                     bins[block][key].push_back(i);
                 }
             }
@@ -176,13 +178,13 @@ namespace ta {
 
 
             done.reset();
-            long long t = queryPos * coreLshInfo.userOffset;
+            long long t = queryPos * userOffset;
 
             for (row_type block = 0; block < activeBlocks; ++block) {
 
                 T key = 0;
-                memcpy(&key, querySketches + t, coreLshInfo.bytesPerCode);
-                t += coreLshInfo.bytesPerCode;
+                memcpy(&key, querySketches + t, bytesPerCode);
+                t += bytesPerCode;
 
                 auto it = bins[block].find(key);
 

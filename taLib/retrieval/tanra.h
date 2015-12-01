@@ -195,9 +195,6 @@ namespace ta {
             }
 
         }
-        inline virtual void cleanupAfterTuning() {
-   
-        }
 
     };
 

@@ -25,6 +25,8 @@
 
 namespace ta {
 
+
+
     struct ListTuneData {
         bool upperActive, lowerActive;
         unordered_map<col_type, double> bestTimeForPhi; // for each phi explored (key) contains the best achieved total time (value) 
@@ -34,7 +36,7 @@ namespace ta {
         col_type* queues;
         row_type t_b_indx;
 
-        inline ListTuneData() : queues(nullptr), upperActive(true), lowerActive(true) {//, prevLists(0)
+        inline ListTuneData() : queues(nullptr), upperActive(true), lowerActive(true) {
         }
 
         inline ~ListTuneData() {
@@ -51,6 +53,12 @@ namespace ta {
         // I drop and recreate the queues for each phi I try out
 
         inline void preprocess(const std::vector<RetrievalArguments>& retrArg, const ProbeBucket& probeBucket, col_type numLists) {
+
+            if (queues != nullptr) {
+                delete[] queues;
+                queues = nullptr;
+            }
+            queues = new col_type[numLists * probeBucket.xValues->size()];
 
             std::vector<QueueElement> tmp;
             tmp.resize(numLists);
@@ -84,7 +92,6 @@ namespace ta {
                     queues[j * numLists + i] = tmp[i].id;
                 }
             }
-
         }
 
         inline void findCutOffPointForList(col_type list, row_type sampleSize, double bestTimeOfPrevPhi, const std::vector<double>* competitorMethod, bool upper) {
@@ -184,7 +191,7 @@ namespace ta {
             preprocess(retrArg, probeBucket, numLists);
             retrArg[0].tunerTimer.stop();
             double preprocessTime = retrArg[0].tunerTimer.elapsedTime().nanos() / (probeBucket.xValues->size() == 0 ? 1 : probeBucket.xValues->size());
-
+       
             retrArg[0].numLists = probeBucket.numLists;
             for (row_type i = 0; i < sampleSize; ++i) {
 
@@ -192,7 +199,7 @@ namespace ta {
                 int ind = probeBucket.xValues->at(i).j;
                 const double* query = retrArg[t].queryMatrix->getMatrixRowPtr(ind);
 
-                const std::vector<QueueElement>& prevResults = prevBucket.sampleThetas->at(t).at(ind).results; //just reading
+                const std::vector<QueueElement>& prevResults = prevBucket.sampleThetas[t].at(ind).results; //just reading
                 std::copy(prevResults.begin(), prevResults.end(), retrArg[0].heap.begin());
 
                 std::make_heap(retrArg[0].heap.begin(), retrArg[0].heap.end(), std::greater<QueueElement>());
@@ -214,12 +221,8 @@ namespace ta {
 
 
             col_type list = prevBucket.numLists; // start with the best numLists of the previous bucket
-            int tries = NUM_LISTS / 2;
 
-            if (queues == nullptr) // reserve memory for queues
-                queues = new col_type[(list + tries) * probeBucket.xValues->size()];
-
-            // explore an initial phi value
+            // explore an QueryBatchial phi value
             tuneBucketForList(probeBucket, list, -1, true, retrArg, retriever);
 
             // Here I keep track of the best total runtime 
@@ -227,6 +230,7 @@ namespace ta {
             double bestTimeOfPrevPhiOnRight = bestTimeForPhi[list - 1];
 
             // explore phi values left and right of the QueryBatchial phi value
+            int tries = NUM_LISTS / 2;
             for (col_type i = 1; i <= tries; ++i) {
 
                 if (upperActive) {
@@ -241,7 +245,7 @@ namespace ta {
                     break;
             }
 
-            if (queues != nullptr) {// release memory for queues
+            if (queues != nullptr) {
                 delete [] queues;
                 queues = nullptr;
             }
@@ -257,15 +261,13 @@ namespace ta {
             lowerActive = true;
 
             col_type list = prevBucket.numLists; // start with the best numLists of the previous bucket
-            int tries = NUM_LISTS / 2;
-
-            if (queues == nullptr) // reserve memory for queues
-                queues = new col_type[(list + tries) * probeBucket.xValues->size()];
-
             tuneBucketForListTopk(probeBucket, prevBucket, retrArg, list, -1, true, retriever);
 
             double previousForUpper = bestTimeForPhi[list - 1];
             double previousForLower = bestTimeForPhi[list - 1];
+
+
+            int tries = NUM_LISTS / 2;
 
             for (col_type i = 1; i <= tries; ++i) {
 
@@ -281,7 +283,7 @@ namespace ta {
                     break;
             }
 
-            if (queues != nullptr) {// release memory for queues
+            if (queues != nullptr) {
                 delete [] queues;
                 queues = nullptr;
             }
