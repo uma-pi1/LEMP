@@ -140,18 +140,18 @@ namespace ta {
 
 #ifdef RELATIVE_APPROX
                         if (minScoreAppr >= 0) {
-                            minScoreAppr *= (1 + arg->gamma);
-                            arg->currGammaAppr = (1 + arg->gamma);
+                            minScoreAppr *= (1 + arg->epsilon);
+                            arg->currEpsilonAppr = (1 + arg->epsilon);
                         } else {
-                            minScoreAppr *= (1 - arg->gamma);
-                            arg->currGammaAppr = (1 - arg->gamma);
+                            minScoreAppr *= (1 - arg->epsilon);
+                            arg->currEpsilonAppr = (1 - arg->epsilon);
                         }
 
 
 #else 
 #ifdef         ABS_APPROX             
-                        minScoreAppr += arg->queryMatrix->gammaEquivalents[user];
-                        arg->currGammaAppr = arg->queryMatrix->gammaEquivalents[user];
+                        minScoreAppr += arg->queryMatrix->epsilonEquivalents[user];
+                        arg->currEpsilonAppr = arg->queryMatrix->epsilonEquivalents[user];
 
 #endif
 #endif

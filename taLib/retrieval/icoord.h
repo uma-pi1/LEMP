@@ -168,10 +168,10 @@ namespace ta {
 
 
 #ifdef RELATIVE_APPROX
-            localTheta *= arg->currGammaAppr;
+            localTheta *= arg->currEpsilonAppr;
 #else 
 #ifdef         ABS_APPROX             
-            localTheta += arg->currGammaAppr;
+            localTheta += arg->currEpsilonAppr;
 #endif
 #endif
 
@@ -262,10 +262,10 @@ namespace ta {
                         double len = arg->probeMatrix->lengthInfo[row + probeBucket.startPos].data;
                         double privTheta = arg->heap.front().data;
 #ifdef RELATIVE_APPROX
-                        privTheta *= arg->currGammaAppr;
+                        privTheta *= arg->currEpsilonAppr;
 #else 
 #ifdef         ABS_APPROX             
-                        privTheta += arg->currGammaAppr;
+                        privTheta += arg->currEpsilonAppr;
 #endif
 #endif
 
@@ -383,16 +383,16 @@ namespace ta {
                 double minScoreAppr = minScore;
 #ifdef RELATIVE_APPROX
                 if (minScoreAppr >= 0) {
-                    minScoreAppr *= (1 + arg->gamma);
-                    arg->currGammaAppr = (1 + arg->gamma);
+                    minScoreAppr *= (1 + arg->epsilon);
+                    arg->currEpsilonAppr = (1 + arg->epsilon);
                 } else {
-                    minScoreAppr *= (1 - arg->gamma);
-                    arg->currGammaAppr = (1 - arg->gamma);
+                    minScoreAppr *= (1 - arg->epsilon);
+                    arg->currEpsilonAppr = (1 - arg->epsilon);
                 }
 #else 
 #ifdef         ABS_APPROX             
-                minScoreAppr += arg->queryMatrix->gammaEquivalents[user];
-                arg->currGammaAppr = arg->queryMatrix->gammaEquivalents[user];
+                minScoreAppr += arg->queryMatrix->epsilonEquivalents[user];
+                arg->currEpsilonAppr = arg->queryMatrix->epsilonEquivalents[user];
 #endif
 #endif
 
@@ -476,16 +476,16 @@ namespace ta {
 
 #ifdef RELATIVE_APPROX
                     if (minScoreAppr >= 0) {
-                        minScoreAppr *= (1 + arg->gamma);
-                        arg->currGammaAppr = (1 + arg->gamma);
+                        minScoreAppr *= (1 + arg->epsilon);
+                        arg->currEpsilonAppr = (1 + arg->epsilon);
                     } else {
-                        minScoreAppr *= (1 - arg->gamma);
-                        arg->currGammaAppr = (1 - arg->gamma);
+                        minScoreAppr *= (1 - arg->epsilon);
+                        arg->currEpsilonAppr = (1 - arg->epsilon);
                     }
 #else 
 #ifdef         ABS_APPROX             
-                    minScoreAppr += arg->queryMatrix->gammaEquivalents[user];
-                    arg->currGammaAppr = arg->queryMatrix->gammaEquivalents[user];
+                    minScoreAppr += arg->queryMatrix->epsilonEquivalents[user];
+                    arg->currEpsilonAppr = arg->queryMatrix->epsilonEquivalents[user];
 #endif
 #endif
 
