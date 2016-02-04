@@ -25,7 +25,6 @@
 #include <boost/numeric/ublas/matrix_proxy.hpp>
 #include <fstream>
 #include <iostream>
-#include <cassert>
 #include <cmath>
 #include <util/exception.h>
 #include <util/io.h>

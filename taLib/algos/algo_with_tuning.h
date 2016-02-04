@@ -628,7 +628,7 @@ namespace ta {
 
                         // then do the actual tuning
                         for (row_type b = 0; b < activeBuckets; ++b) {
-                            probeBuckets[b].ptrRetriever->tune(probeBuckets[b], (b == 0 ? probeBuckets[b] : probeBuckets[b - 1]), retrArg);
+                            probeBuckets[b].ptrRetriever->tune(probeBuckets[b], (b == 0 ? probeBuckets[b] : probeBuckets[b - 1]), retrArg);                                                        
                         }
 
                         t.stop();

@@ -119,7 +119,7 @@ namespace ta {
             if (cp_array != nullptr)
                 delete[] cp_array;
             if (ext_cp_array != nullptr)
-                delete[] cp_array;
+                delete[] ext_cp_array;
             if (candidatesToVerify != nullptr)
                 delete[] candidatesToVerify;
             if (hashlen != nullptr)

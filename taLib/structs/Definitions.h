@@ -42,7 +42,7 @@
 #define NUM_LISTS    10
 
 // #define RELATIVE_APPROX
-// #define ABS_APPROX
+//#define ABS_APPROX
 
 
 // for probeBuckets

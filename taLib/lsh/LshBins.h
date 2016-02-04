@@ -144,7 +144,7 @@ namespace ta {
             bins.resize(endBlock);
             row_type startOffset = bytesPerCode * startBlock;
 
-
+            
             for (row_type i = 0; i < nVectors; ++i) {
                 long long t = i * userOffset + startOffset;
 
