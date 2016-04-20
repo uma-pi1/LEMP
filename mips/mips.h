@@ -26,7 +26,6 @@
 
 
 #include <mips/structs/VectorMatrix.h>
-#include <mips/structs/VectorMatrix2.h>
 #include <mips/structs/Results.h>
 #include <mips/structs/Output.h>
 #include <mips/structs/Lists.h>
