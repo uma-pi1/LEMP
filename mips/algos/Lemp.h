@@ -254,7 +254,7 @@ namespace mips {
             totalComparisons += comparisons;
             std::cout << "[RETRIEVAL] ... and is finished with " << results.getResultSize() << " results" << std::endl;
 
-            std::cout << "TOTAL ERROR: " << totalError / leftMatrix.rowNum << " countABOVE: " << countABOVE << std::endl;
+//             std::cout << "TOTAL ERROR: " << totalError / leftMatrix.rowNum << " countABOVE: " << countABOVE << std::endl;
             logging << totalError / leftMatrix.rowNum << "\t" << results.getResultSize() << "\t";
 
             outputStats();
@@ -574,7 +574,7 @@ namespace mips {
                 break;
 
         }
-        std::cout << "Done creating lists" << std::endl;
+//         std::cout << "Done creating lists" << std::endl;
     }
 
     inline void Lemp::tune(std::vector<RetrievalArguments>& retrArg, row_type allQueries) {
