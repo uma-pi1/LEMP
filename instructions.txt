@@ -1,0 +1,294 @@
+This project contains code for the LEMP framework described in:
+
+"LEMP: Fast Retrieval of Large Entries in a Matrix Product", C.Teflioudi, R.Gemulla, O.Mykytiuk, in SIGMOD 2015.
+
+The task of LEMP is, given two input matrices Q^T and P, to find all large entries in their product Q^TP. For more information about potential application scenarios and about the framework itself, please refer to the above paper.
+
+LEMP adapts many existing techniques (Trees, L2AP) for the problem of large-entry retrieval.
+The code regarding these methods is to a big extend copied from publicly available code provided by the authors of these methods (the original licences are included).
+
+1. REQUIREMENTS
+
+    LEMP is using C++11. gcc 4.7 or higher is needed. You will also need Boost (tried on 1.49).
+
+1.1 REQUIREMENTS FOR LEMP_TREE
+
+    mlpack has the following dependencies:
+
+      Armadillo     >= 3.6.0
+      LibXml2       >= 2.6.0
+      Boost (program_options, math_c99, unit_test_framework, random)
+      CMake         >= 2.8.5
+
+    All of those should be available in your distribution's package manager.  If
+    not, you will have to compile each of them by hand.  See the documentation for
+    each of those packages for more information.
+
+    If you are compiling Armadillo by hand, ensure that LAPACK and BLAS are enabled.
+
+1.2 REQUIREMENTS FOR LEMP_AP
+
+    L2AP uses a number of memory allocation and file handling routines from GKlib, a library by George Karypis included with the METIS software. 
+    A compatible version of this library is included in LEMP/GKlib
+    If you do not already have GKlib installed, cd to GKlib, and read BUILD.txt for installation instructions. GKlib requires CMake 2.8 to build.
+
+2. MAXIMUM INNER PRODUCT SEARCH (MIPS) ALGORITHMS
+
+    We provide example implementations for a set of algorithms for maximum inner product search (MIPS).
+    All algorithms expect 2 matrices as input. One matrix (Q^T) with dimensions m x r and another one (P) with dimensions r x n. 
+    In other words they will solve a problem with m query vectors, n probe vectors, all of dimensionality r.
+
+    Here is a list of the algorithms implemented:
+    1. NAIVE (exact MIPS, both Above-theta and Row-Top-k)
+    2. LEMP (exact and approximate MIPS, both Above-theta and Row-Top-k).
+    3. PCA_TREE (approximate MIPS, only Row-Top-k): based on the algorithm described in 
+    4. SIMPLE_LSH (approximate MIPS, only Row-Top-k): based on the algorithm described in 
+    5. TA (exact MIPS, both Above-theta and Row-Top-k): using Fagin's Threshold Algorithm with random accesses allowed. One can choose the next list to be explored round-robin  or by picking the list that carries the maximum pi*qi.
+    6. TA_NRA (exact MIPS, only Above-theta): As above but the algorithm is using non-random-accesses. Here we implemented only the above-theta version. The top-k version will be too expensive.
+
+    In the folder mips/examples you can find examples of how to call these algorithms.
+
+3. CREATING INPUT MATRICES
+
+    We provide three possibilities to create input matrices. The datasets used in the paper "LEMP: Fast Retrieval of Large Entries in a Matrix Product" can be found at http://dws.informatik.uni-mannheim.de/en/resources/software/lemp/
+
+    (1) .mma files 
+
+		Such files look, for example, like the following:
+		%%MatrixMarket matrix array real general
+		% First line: ROWS COLUMNS
+		% Subsequent lines: entries in column-major order
+		3 2
+		a11
+		a21
+		a31
+		a12
+		a22
+		a32
+
+    (2) .csv files (comma separated values). Each line corresponds to a vector and the coordinate values are separated with commas. In this case, the user should additionally provide the dimensions of the datasets m, r, n.
+
+		Such files look, for example, like the following:
+		a11, a12
+		a21, a22
+		a31, a32
+
+    (3) several std::vector's of double values. This might be interesting when executing MIPS in a streaming case.
+
+2. BUILD MIPS
+
+    type:
+
+	$ cd MIPS
+    $ mkdir build
+	$ cd build
+    $ cmake  ../
+    $ make
+
+3. EXAMPLE USAGE OF MIPS
+
+    Beside the examples in mips/examples we also provide command line tools for each algorithm in the folder mips/tools.
+    You can execute them by calling the corresponding tool from the command line with your specific arguments as input.
+
+3.1 RUN LEMP
+
+    Change the directory to mips/build/tools. The executable for LEMP is called ./runLemp.
+
+    Type ./runLemp to see the parameters:
+
+	--help                         produce help message
+	--Q^T arg                      file containing the query matrix (left side)
+	--P arg                        file containing the probe matrix (right side)
+	--theta arg                    theta value
+	--R arg (=0.96999999999999997) recall parameter for LSH
+	--epsilon arg (=0)             epsilon value for LEMP-LI with Absolute or 
+		                             Relative Approximation
+	--querySideLeft arg (=1)       1 if Q^T contains the queries (default). 
+		                             Interesting for Row-Top-k
+	--isTARR arg (=1)              for LEMP-TA. If 1 Round Robin schedule is used
+		                             (default). Otherwise Max PiQi
+	--method arg                   LEMP_X where X: L, LI, LC, I, C, TA, TREE, AP,
+		                             LSH
+	--k arg (=0)                   top k (default 0). If 0 Above-theta will run
+	--logFile arg                  output File (contains runtime information)
+	--resultsFile arg              output File (contains the results)
+	--cacheSizeinKB arg (=8192)    cache size in KB
+	--t arg (=1)                   num of threads (default 1)
+	--r arg (=0)                   num of coordinates in each vector (needed when
+		                             reading from csv files)
+	--m arg (=0)                   num of vectors in Q^T (needed when reading 
+		                             from csv files)
+	--n arg (=0)                   num of vectors in P (needed when reading from 
+		                             csv files)
+
+    If --k=0 (default value) the program will try to solve the Above-theta problem. Otherwise the Row-Top-k.
+    If you wish to run Column-Top-k, set --querySideLeft=0.
+    For filling in the value "cacheSizeinKB", use the command: cat /proc/cpuinfo and get the value (cache size)/(cpu cores). This is important since LEMP tries to optimize for cache utilization.
+    If you want to further speed up the inner product computation uncomment the flag WITH_SIMD in mips/structs/Definitions.h and recompile.
+    If you want to further speed up the COORD/ICOORD scanning uncomment the flag WITH_SIMD_INCR in mips/structs/Definitions.h and recompile.
+
+    LEMP can choose from a variety of methods to use inside its buckets. You can use:
+    LEMP_L: LEMP with the LENGTH algorithm (a version of naive retrieval). It prunes only based on skew in the length distribution of the vectors.
+    LEMP_LI: like LEMP_I, but in this case within a bucket lemp can use either LENGTH or INCR depending on the query vector and the bucket's properties.
+    LEMP_LC: like LEMP_LC, but with COORD instead of INCR.
+    LEMP_I: LEMP with the INCR algorithm. It can prune buckets due to skew in the length distribution. For the remaining buckets it will INCR for further pruning based on the vectors' directions.
+    LEMP_C: like LEMP_I but with COORD instead of INCR
+    LEMP_TA: like LEMP_I but with Fagin's TA algorithm instead of INCR. TA can use a round-robin schedule for choosing the next list to make a step (isTARR=1) or it can choose the list with the maximum pi*qi. 
+    LEMP_TREE: like LEMP_I but with the cover trees algorithm instead of INCR. Note that the this method, within a bucket we search for large inner products and not high cosine similarity as with the previous methods.
+    LEMP_AP: like LEMP_I but with L2AP algorithm instead of INCR.
+    LEMP_LSH: a combination of LSH and L within buckets. LSH will create up to 200 signatures of 8 bits each for each vector. You can change these values in  mips/structs/Definitions.h and recompile.
+
+    According to our experiments, the best performing exact method was LEMP_LI.
+
+    To use LEMP-LI with the Relative or Absolute approximation (LEMP-REL, LEMP-ABS), uncomment the corresponding flags in mips/structs/Definitions.h and recompile. Running LEMP-LI will then run the approximate version. 
+    To use LEMP-HYB uncomment the flag HYBRID_APPROX in mips/structs/Definitions.h recompile and use as method argument LEMP_LSH.
+    
+3.1.1 RUN LEMP (ABOVE-THETA)
+
+    Find all entries with theta >= 0.035 on a machine with 2048 cache per core using LEMP_LI:
+
+    ./runLemp --Q^T="../../dataset/w-gnmf-sample.mma" --P="../../dataset/h-gnmf-sample.mma" --theta=0.035 --method="LEMP_LI" --cacheSizeinKB=2048 --logFile="../../results/log.txt"
+
+    Output:
+
+    [INFO] VectorMatrix will be read from ../../dataset/w-gnmf-sample.mma (1000 vectors with dimensionality 50)
+    [INFO] VectorMatrix will be read from ../../dataset/h-gnmf-sample.mma (1000 vectors with dimensionality 50)
+    [INFO] Logging in ../../results/log.txt
+    [INIT] ProbeMatrix contains 1000 vectors with dimensionality 50
+    [INIT] ProbeBuckets = 32
+    [ALGORITHM] LEMP_LI with 1 thread(s)
+    [RETRIEVAL] QueryMatrix contains 1000 vectors with dimensionality 50
+    [RETRIEVAL] QueryBatches = 1
+    [RETRIEVAL] ProbeBuckets (active) = 3
+    [RETRIEVAL] Retrieval (theta = 0.035) starts ...
+    [RETRIEVAL] ... and is finished with 72 results
+    [STATS] comparisons = 262
+    [STATS] preprocessing time = 0.000884s
+    [STATS] tuning time = 0.000135s
+    [STATS] retrieval time = 0.000396s
+    [STATS] total time = 0.001415s
+
+    Explanation:
+
+    The program reports the number of probe buckets created and the number of buckets for which LEMP constructs indexes.
+    The latter is the exact number in the case of Above-theta and a lower bound for Row-Top-k.
+    We also report preprocessing time (sorting, bucketization, index construction), tuning time, retrieval time and total time.
+    In addition, MIPS reports the size of the results and number of candidates verified (comparisons).
+
+    In the file log.txt, MIPS reports in tab seperated values format:
+    algorithm	threads	P(vectors x dimensionality)	Q^T(vectors x dimensionality)	theta(value) resultsSize comparisons	preprocessingTime	tuningTime	retrievalTime	totalTime
+
+    If a resultsFile is specified, LEMP will use it to output its results. Each line in the file corresponds to a large entry in the form:
+    query_vector_id probe_vector_id score where "score" can be the inner product of the two vectors (Above-theta) or the inner product divided by the length of the query (Row-Top-k).
+
+3.1.2 RUN LEMP (ROW-TOP-K)
+
+    Find the Row-Top-10 on a machine with 2048 cache per core using LEMP_LI:
+
+    ./runLemp --Q^T="../../dataset/w-gnmf-sample.mma" --P="../../dataset/h-gnmf-sample.mma" --k=10 --method="LEMP_LI" --cacheSizeinKB=2048 --logFile="../../results/log.txt"
+
+    Output:
+
+    [INFO] VectorMatrix will be read from ../../dataset/w-gnmf-sample.mma (1000 vectors with dimensionality 50)
+    [INFO] VectorMatrix will be read from ../../dataset/h-gnmf-sample.mma (1000 vectors with dimensionality 50)
+    [INFO] Logging in ../../results/log.txt
+    [INIT] ProbeMatrix contains 1000 vectors with dimensionality 50
+    [INIT] ProbeBuckets = 32
+    [ALGORITHM] LEMP_LI with 1 thread(s)
+    [RETRIEVAL] QueryMatrix contains 1000 vectors with dimensionality 50
+    [RETRIEVAL] QueryBatches = 1
+    [RETRIEVAL] ProbeBuckets (active) = 15
+    [RETRIEVAL] Retrieval (k = 10) starts ...
+    [RETRIEVAL] ... and is finished with 10000 results
+    [STATS] comparisons = 76841
+    [STATS] preprocessing time = 0.001967s
+    [STATS] tuning time = 0.001589s
+    [STATS] retrieval time = 0.011361s
+    [STATS] total time = 0.014917s
+
+3.2 RUN OTHER MIPS ALGORITHMS
+
+    If you wish to run NAIVE the executable is called ./runNaive with the parameters:
+
+        --help                   produce help message
+	--Q^T arg                file containing Q^T
+	--P arg                  file containing the P
+	--theta arg              theta
+	--k arg (=0)             top k (default 0). If 0 Above-theta will run
+	--querySideLeft arg (=1) 1 if Q^T contains the queries (default). Interesting
+		                       for Row-Top-k
+	--logFile arg            output File (contains runtime information)
+	--resultsFile arg        output File (contains the results)
+	--t arg (=1)             num of threads (default 1)
+	--r arg (=0)             num of coordinates in each vector (needed when 
+		                       reading from csv files)
+	--m arg (=0)             num of vectors in Q^T (needed when reading from csv 
+		                       files)
+	--n arg (=0)             num of vectors in P (needed when reading from csv 
+		                       files)
+
+    If you wish to run TA the executable is called ./runTa with the parameters:
+
+	--help                   produce help message
+	--Q^T arg                file containing Q^T
+	--P arg                  file containing the P
+	--theta arg              theta value
+	--k arg (=0)             top k (default 0). If 0 Above-theta will run
+	--querySideLeft arg (=1) 1 if Q^T contains the queries (default). Interesting
+		                       for Row-Top-k
+	--isTARR arg (=1)        If 1 Round Robin schedule is used (default). 
+		                       Otherwise Max PiQi
+	--logFile arg            output File (contains runtime information)
+	--resultsFile arg        output File (contains the results)
+	--t arg (=1)             num of threads (default 1)
+	--r arg (=0)             num of coordinates in each vector (needed when 
+		                       reading from csv files)
+	--m arg (=0)             num of vectors in Q^T (needed when reading from csv 
+		                       files)
+	--n arg (=0)             num of vectors in P (needed when reading from csv 
+		                       files)
+
+    If you wish to run PCA_TREE the executable is called ./runPcaTree with the parameters:
+
+	--help                   produce help message
+	--Q^T arg                file containing the query matrix (left side)
+	--P arg                  file containing the probe matrix (right side)
+	--k arg (=5)             top k (default = 5)
+	--querySideLeft arg (=1) 1 if Q^T contains the queries (default). Interesting
+		                       for Row-Top-k
+	--isTransformed arg (=0) 1 if the input files contain the tranformed vectors.
+		                       If 0 the program will transform them
+	--logFile arg            output File (contains runtime information)
+	--resultsFile arg        output File (contains the results)
+	--d arg (=0)             depth of the tree (default = 0)
+	--t arg (=1)             num of threads (default 1)
+	--r arg (=0)             num of coordinates in each vector (needed when 
+		                       reading from csv files)
+	--m arg (=0)             num of vectors in Q^T (needed when reading from csv 
+		                       files)
+	--n arg (=0)             num of vectors in P (needed when reading from csv 
+		                       files)
+
+    If you wish to run SIMPLE_LSH (to use it, set the parameters LSH_SIGNATURES and LSH_CODE_LENGTH in mips/structs/Definitions.h to the desired values and recompile) the executable is called ./runSimpleLsh with the parameters:
+
+	--help                   produce help message
+	--Q^T arg                file containing the query matrix (left side)
+	--P arg                  file containing the probe matrix (right side)
+	--querySideLeft arg (=1) 1 if Q^T contains the queries (default). Interesting
+		                       for Row-Top-k
+	--isTransformed arg (=0) 1 if the input files contain the tranformed vectors.
+		                       If 0 the program will transform them
+	--k arg                  top k 
+	--logFile arg            output File (contains runtime information)
+	--resultsFile arg        output File (contains the results)
+	--t arg (=1)             num of threads (default 1)
+	--r arg (=0)             num of coordinates in each vector (needed when 
+		                       reading from csv files)
+	--m arg (=0)             num of vectors in Q^T (needed when reading from csv 
+		                       files)
+	--n arg (=0)             num of vectors in P (needed when reading from csv 
+		                       files)
+
+4. CONTACT US
+
+    Did you find any bugs? Do you have questions? Feel free to contact us: chteflio@mpi-inf.mpg.de
