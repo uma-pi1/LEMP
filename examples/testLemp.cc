@@ -46,12 +46,9 @@ int main() {
     VectorMatrix leftMatrix, rightMatrix;
 
     // (1) create a VectorMatrix by using .mma files
-//    string queryFile = "../../dataset/w-gnmf-sample.mma";
-//    string probeFile = "../../dataset/h-gnmf-sample.mma";
-//    string queryFile = "/home/chteflio/chteflioInMPI/data/ta-data/w-50-gnmf-zero.mma";
-//    string probeFile = "/home/chteflio/chteflioInMPI/data/ta-data/h-50-gnmf-zero.mma";
-    string queryFile = "/home/chteflio/chteflioInMPI/data/ta-data/w50-net-noav.mma";
-    string probeFile = "/home/chteflio/chteflioInMPI/data/ta-data/h50-net-noav.mma";
+   string queryFile = "../../dataset/w-gnmf-sample.mma";
+   string probeFile = "../../dataset/h-gnmf-sample.mma";
+
     
     leftMatrix.readFromFile(queryFile, 0,0, true);
     rightMatrix.readFromFile(probeFile, 0,0, false);
